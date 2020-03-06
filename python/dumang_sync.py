@@ -20,6 +20,7 @@ def initialize_devices():
 
         ctrl_device = []
         for d in device_list:
+            # TODO: Is there some way to check version of firmware?
             if d['interface_number'] == 1:
                 ctrl_device.append(d)
 
