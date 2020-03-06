@@ -1,3 +1,10 @@
+import hid
+import sys
+import signal
+import queue
+import logging
+logger = logging.getLogger(__name__)
+
 INIT_CMD = 0x30
 SYNC_CMD = 0x46
 INFO_CMD = 0x18
@@ -6,9 +13,12 @@ LAYER_DEPRESS_CMD = 0x3C
 LIGHT_PULSE_CMD = 0x2A
 KEY_REPORT_REQUEST_CMD = 0x04
 KEY_REPORT_RESPONSE_CMD = 0x05
+KEY_CONFIGURE_CMD = 0x09
 
 VENDOR_ID = 0x0483
 PRODUCT_ID = 0x5710
+
+MAX_KEYS = 256
 
 class Keycode:
     A = 0x04
@@ -271,16 +281,29 @@ class Keycode:
 
     def __init__(self, keycode):
         self.keycode = keycode
+        self.keystr = "UNKNOWN"
 
-    def __repr__(self):
         for attribute in Keycode.__dict__.keys():
             if attribute[:2] != '__':
                 value = getattr(Keycode, attribute)
                 if not callable(value):
                     if self.keycode == value:
-                        return "{}".format(attribute)
+                        self.keystr = attribute
 
-        return "UNKNOWN"
+    @classmethod
+    def fromstr(cls, keystr):
+        for attribute in Keycode.__dict__.keys():
+            if attribute[:2] != '__':
+                value = getattr(Keycode, attribute)
+                if not callable(value):
+                    if keystr == attribute:
+                        return cls(value)
+
+    def encode(self):
+        return self.keycode
+
+    def __repr__(self):
+        return "{}".format(self.keystr)
 
 # TODO: Implement remaining packet types.
 class DuMangPacket:
@@ -395,3 +418,62 @@ class KeyReportResponsePacket(DuMangPacket):
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{:02X} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
+
+class KeyConfigurePacket(DuMangPacket):
+    def __init__(self, key, layer_keycodes):
+        super().__init__(KEY_CONFIGURE_CMD, None)
+        self.key = key
+        self.layer_keycodes = {k: v.encode() if isinstance(v, Keycode) else v for k, v in layer_keycodes.items()}
+
+    def encode(self):
+        return [self.cmd, 0x01, self.layer_keycodes[1], self.layer_keycodes[2], self.layer_keycodes[3], 0xFF, self.layer_keycodes[0]]
+
+    def __repr__(self):
+        return "{} - CMD:{:02X} Key:{:02X} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
+
+def receive_thread(h, q):
+    while True:
+        p = read_packet(h)
+        if p:
+            logger.debug(p)
+            if q:
+                q.put(p)
+
+def send_thread(h, q):
+    while True:
+        p = q.get()
+        h.write(p.encode())
+        q.task_done()
+
+def signal_handler(signal, frame):
+    sys.exit(0)
+
+def read_packet(h):
+    d = h.read(64)
+    return DuMangPacket.parse(d)
+
+def initialize_devices():
+    init_devices = []
+
+    try:
+        device_list = hid.enumerate(VENDOR_ID, PRODUCT_ID)
+
+        ctrl_device = []
+        for d in device_list:
+            # TODO: Is there some way to check version of firmware?
+            if d['interface_number'] == 1:
+                ctrl_device.append(d)
+
+        for d in ctrl_device:
+            h = hid.device()
+            h.open_path(d['path'])
+            h.write(InitializationPacket().encode())
+            init_devices.append(h)
+
+    except IOError as ex:
+        # TODO: Better error handling.
+        logger.error(ex, exc_info=True)
+        logger.error("Likely permissions error.")
+        sys.exit(1)
+
+    return init_devices

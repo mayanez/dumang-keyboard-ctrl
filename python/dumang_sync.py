@@ -1,49 +1,12 @@
-import hid
-import sys
-import signal
 import threading
-import queue
 import logging
 from dumang_common import *
 
 logger = logging.getLogger(__name__)
 
 # NOTE: Enable for debugging
-#logger.setLevel(logging.DEBUG)
-#logger.addHandler(logging.StreamHandler())
-
-def initialize_devices():
-    init_devices = []
-
-    try:
-        device_list = hid.enumerate(VENDOR_ID, PRODUCT_ID)
-
-        ctrl_device = []
-        for d in device_list:
-            # TODO: Is there some way to check version of firmware?
-            if d['interface_number'] == 1:
-                ctrl_device.append(d)
-
-        for d in ctrl_device:
-            h = hid.device()
-            h.open_path(d['path'])
-            h.write(InitializationPacket().encode())
-            init_devices.append(h)
-
-    except IOError as ex:
-        # TODO: Better error handling.
-        logger.error(ex, exc_info=True)
-        logger.error("Likely permissions error.")
-        sys.exit(1)
-
-    return init_devices
-
-def read_packet(h):
-    d = h.read(64)
-    return DuMangPacket.parse(d)
-
-def signal_handler(signal, frame):
-    sys.exit(0)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler())
 
 def layer_toggle_process(p):
     press = 0
@@ -72,22 +35,15 @@ def send_response(h, p):
     if response:
         h.write(response)
 
-def receive_thread(h, q):
-    while True:
-        p = read_packet(h)
-        if p:
-            logger.debug(p)
-            q.put(p)
-
-def send_thread(h, q):
+def response_thread(h, q):
     while True:
         p = q.get()
         send_response(h, p)
         q.task_done()
 
 def init_synchronization_threads(h, h2, q, q2):
-    s1 = threading.Thread(target=send_thread, args=(h, q2, ), daemon=True)
-    s2 = threading.Thread(target=send_thread, args=(h2, q, ), daemon=True)
+    s1 = threading.Thread(target=response_thread, args=(h, q2, ), daemon=True)
+    s2 = threading.Thread(target=response_thread, args=(h2, q, ), daemon=True)
     return [s1, s2]
 
 def init_receive_threads(h, h2, q, q2):
@@ -103,6 +59,7 @@ if __name__ == "__main__":
     q = queue.Queue()
     q2 = queue.Queue()
 
+    # TODO: Handle if only one half
     h, h2 = initialize_devices()
 
     threads.extend(init_receive_threads(h, h2, q, q2))

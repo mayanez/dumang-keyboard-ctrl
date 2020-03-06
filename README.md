@@ -10,15 +10,15 @@ These keyboards are fully programmable and support multiple layers.
 
 #### Debian/Ubuntu
 
-    $ apt-get install libusb-1.0.0-dev libudev
+    $ apt-get install libusb-1.0.0-dev libudev qtbase5-dev
 
 #### Arch Linux
 
-    $ pacman -S libusb
+    $ pacman -S libusb qt5-base
 
 ### Python
 
-    $ pip install hidapi
+    $ pip install hidapi docopt PyQt5
 
 For correct functionality under Linux, you need to copy the udev file provided in this repo into the appropriate directory for you distro. You might then need to call `udevadm control --reload-rules` to reload the rules.
 
@@ -36,4 +36,5 @@ You may want to setup this tool to run at startup. Depending on your distributio
 
 ### Programming Tool
 
-This tool is yet to come as I continue to reverse engineer the protocol, but should provide the same functionality as their Windows/Mac tool.
+`dumang_config.py` provides a very rough version of the programming tool. Please refer to the help message for options on how to run. Essentially it uses a `config.yml` that configures each key for a given layer.
+The `inspect` command launches a GUI that you can use to toggle the LED for a particular key in order to get its keycode. I'm new to GUI programming so don't expect anything fancy yet.
