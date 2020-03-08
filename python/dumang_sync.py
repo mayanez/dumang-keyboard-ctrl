@@ -1,5 +1,5 @@
-import threading
 import logging
+import pyudev
 from dumang_common import *
 
 logger = logging.getLogger(__name__)
@@ -24,49 +24,82 @@ def layer_toggle_process(p):
     #     half = 0x02
 
     if (press > 0):
-        return SyncPacket(p.ID, press, p.layer_info).encode()
+        return SyncPacket(p.ID, press, p.layer_info)
 
-def send_response(h, p):
+def send_response(p, q):
     response = None
 
     if isinstance(p, LayerPressPacket) or isinstance(p, LayerDepressPacket):
         response = layer_toggle_process(p)
 
     if response:
-        h.write(response)
+        q.put(response)
 
-def response_thread(h, q):
-    while True:
-        p = q.get()
-        send_response(h, p)
-        q.task_done()
+def sync_thread(kbd1, kbd2):
+    p = kbd1.recv_q.get()
+    if isinstance(p, JobKiller):
+        print('sync kill')
+        sys.exit(0)
+    send_response(p, kbd2.send_q)
+    kbd1.recv_q.task_done()
 
-def init_synchronization_threads(h, h2, q, q2):
-    s1 = threading.Thread(target=response_thread, args=(h, q2, ), daemon=True)
-    s2 = threading.Thread(target=response_thread, args=(h2, q, ), daemon=True)
+def init_synchronization_threads(kbd1, kbd2):
+    s1 = Job(target=sync_thread, args=(kbd1, kbd2, ), daemon=True)
+    s2 = Job(target=sync_thread, args=(kbd2, kbd1, ), daemon=True)
     return [s1, s2]
 
-def init_receive_threads(h, h2, q, q2):
-    r1 = threading.Thread(target=receive_thread, args=(h, q, ), daemon=True)
-    r2 = threading.Thread(target=receive_thread, args=(h2, q2, ), daemon=True)
+def init_send_threads(kbd1, kbd2):
+    s1 = Job(target=kbd1.send_thread, daemon=True)
+    s2 = Job(target=kbd2.send_thread, daemon=True)
+    return [s1, s2]
+
+def init_receive_threads(kbd1, kbd2):
+    r1 = Job(target=kbd1.receive_thread, daemon=True)
+    r2 = Job(target=kbd2.receive_thread, daemon=True)
     return [r1, r2]
+
+def device_init_thread(monitor):
+    threads = []
+
+    while True:
+        status = monitor.get_status()
+        if status == 'ready':
+            kbd1, kbd2 = initialize_devices()
+
+            threads.extend(init_send_threads(kbd1, kbd2))
+            threads.extend(init_receive_threads(kbd1, kbd2))
+            threads.extend(init_synchronization_threads(kbd1, kbd2))
+
+            for t in threads:
+                t.start()
+        elif status == 'wait':
+            # NOTE: Kill threads and wait for devices to be reconnected.
+            kbd1.kill_threads()
+            kbd2.kill_threads()
+
+            for t in threads:
+                t.shutdown_flag.set()
+
+            for t in threads:
+                t.join()
+
+            kbd1.close()
+            kbd2.close()
 
 if __name__ == "__main__":
 
-    threads = []
     signal.signal(signal.SIGINT, signal_handler)
 
-    q = queue.Queue()
-    q2 = queue.Queue()
+    if sys.platform.startswith("linux"):
+        monitor = LinuxUSBConnectionMonitor(VENDOR_ID, PRODUCT_ID)
+    else:
+        # Does nothing.
+        monitor = USBConnectionMonitor(VENDOR_ID, PRODUCT_ID)
 
-    # TODO: Handle if only one half
-    h, h2 = initialize_devices()
+    monitor.start()
 
-    threads.extend(init_receive_threads(h, h2, q, q2))
-    threads.extend(init_synchronization_threads(h, h2, q, q2))
+    t = threading.Thread(target=device_init_thread, args=(monitor, ), daemon=True)
+    t.start()
+    t.join()
 
-    for t in threads:
-        t.start()
-
-    for t in threads:
-        t.join()
+    monitor.join()

@@ -2,8 +2,16 @@ import hid
 import sys
 import signal
 import queue
+import threading
 import logging
+
+if sys.platform.startswith("linux"):
+    import pyudev
+
 logger = logging.getLogger(__name__)
+
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler())
 
 INIT_CMD = 0x30
 SYNC_CMD = 0x46
@@ -17,9 +25,13 @@ KEY_CONFIGURE_CMD = 0x09
 
 VENDOR_ID = 0x0483
 PRODUCT_ID = 0x5710
+KBD_1_ID = 0x25
+KBD_2_ID = 0x0D
 
 MAX_KEYS = 256
+UNKNOWN_KEYCODE_STR = "UNKNOWN"
 
+# TODO: This needs to take into account DuMang LT/FN keys.
 class Keycode:
     A = 0x04
     """``a`` and ``A``"""
@@ -281,7 +293,7 @@ class Keycode:
 
     def __init__(self, keycode):
         self.keycode = keycode
-        self.keystr = "UNKNOWN"
+        self.keystr = UNKNOWN_KEYCODE_STR
 
         for attribute in Keycode.__dict__.keys():
             if attribute[:2] != '__':
@@ -289,6 +301,15 @@ class Keycode:
                 if not callable(value):
                     if self.keycode == value:
                         self.keystr = attribute
+
+    def __lt__(self, other):
+        return self.keycode < other.keycode
+
+    def __eq__(self, other):
+        return self.keycode == other.keycode
+
+    def __hash__(self):
+        return hash(self.keycode)
 
     @classmethod
     def fromstr(cls, keystr):
@@ -305,7 +326,145 @@ class Keycode:
     def __repr__(self):
         return "{}".format(self.keystr)
 
+class Job(threading.Thread):
+    def __init__(self, **kwargs):
+        try:
+            args = kwargs['args']
+        except KeyError:
+            args = []
+
+        super().__init__(target=kwargs['target'], args=args, daemon=kwargs['daemon'])
+        self.shutdown_flag = threading.Event()
+        self.started = False
+
+    def run(self):
+        while not self.shutdown_flag.is_set():
+            self._target(*self._args, **self._kwargs)
+        logger.debug('Thread Killed')
+
+    def start(self):
+        if not self.started:
+            self.started = True
+            super().start()
+        else:
+            logger.debug('Thread previously started')
+
+class JobKiller:
+    def __init__(self):
+        self.init = True
+
 # TODO: Implement remaining packet types.
+class DuMangKeyModule:
+    def __init__(self, key, layer_keycodes=None):
+        self.key = key
+        self.layer_keycodes = layer_keycodes
+
+    def __lt__(self, other):
+        return self.key < other.key
+
+    def __eq__(self, other):
+        return self.key == other.key
+
+    def __hash__(self):
+        return hash(self.key)
+
+    def encode(self):
+        return self.key
+
+    def __repr__(self):
+        return "{:02X}".format(self.key) if isinstance(self.key, int) else "{}".format(self.key)
+
+class DuMangBoard:
+    READ_TIMEOUT_MS = 50
+
+    def __init__(self, serial, handle):
+        self.serial = serial
+        self.handle = handle
+        self._keys_initialized = False
+        self._configured_keys = {}
+        self.send_q = queue.Queue()
+        self.recv_q = queue.Queue()
+
+    def write(self, rawbytes):
+        self.handle.write(rawbytes)
+
+    def read(self):
+        try:
+            # NOTE: Needs to be non-blocking so thread can be killed atm.
+            # Ideally I prefer it to be blocking.
+            return self.handle.read(64, timeout_ms=DuMangBoard.READ_TIMEOUT_MS)
+        except:
+            return None
+
+    def put(self, v):
+        self.send_q.put(v)
+
+    def close(self):
+        # NOTE: A hacky way of verifying if the handle is still valid.
+        # I wonder if there is a cleaner way to do this.
+        valid = True
+
+        try:
+            self.handle.read(64, timeout_ms=DuMangBoard.READ_TIMEOUT_MS)
+        except OSError:
+            valid = False
+
+        if valid:
+            self.handle.close()
+
+    def read_packet(self):
+        d = self.read()
+        return DuMangPacket.parse(d)
+
+    def write_packet(self, p):
+        self.write(p.encode())
+
+    def kill_threads(self):
+        self.send_q.put(JobKiller())
+        self.recv_q.put(JobKiller())
+
+    def receive_thread(self):
+        p = self.read_packet()
+
+        if p:
+            logger.debug(p)
+            self.recv_q.put(p)
+
+    def send_thread(self):
+        p = self.send_q.get()
+
+        # NOTE: Allows for thread to be killed with blocking queue
+        if isinstance(p, JobKiller):
+            sys.exit(0)
+
+        self.write_packet(p)
+
+    def configured_key(self, k):
+        if self._keys_initialized:
+            return self._configured_keys[k]
+
+    @property
+    def configured_keys(self):
+        if not self._keys_initialized:
+            for k in range(MAX_KEYS):
+                self.put(KeyReportRequestPacket(k))
+
+            while True:
+                # NOTE: Wait for all requests to be sent out and the recv queue to be populated.
+                if self.send_q.empty():
+                    while not self.recv_q.empty():
+                        p = self.recv_q.get()
+                        if isinstance(p, KeyReportResponsePacket):
+                            for l, kc in p.layer_keycodes.items():
+                                if kc.keystr is not UNKNOWN_KEYCODE_STR:
+                                    # NOTE: We add the layer_keycodes to the DKM
+                                    p.key.layer_keycodes = p.layer_keycodes
+                                    self._configured_keys[p.key.key] = p.key
+                    self._keys_initialized = True
+                    break
+
+        return self._configured_keys.values()
+
 class DuMangPacket:
     def __init__(self, cmd, rawbytes):
         self.cmd = cmd
@@ -314,22 +473,23 @@ class DuMangPacket:
     @classmethod
     def parse(cls, rawbytes):
         c = None
-        cmd = rawbytes[0]
+        if rawbytes:
+            cmd = rawbytes[0]
 
-        if (cmd == LAYER_PRESS_CMD):
-            c = LayerPressPacket.fromrawbytes(rawbytes)
-        elif (cmd == LAYER_DEPRESS_CMD):
-            c = LayerDepressPacket.fromrawbytes(rawbytes)
-        elif (cmd == INIT_CMD):
-            c = InitializationPacket()
-        elif (cmd == SYNC_CMD):
-            c = SyncPacket()
-        elif (cmd == LIGHT_PULSE_CMD):
-            c = LightPulsePacket.fromrawbytes(rawbytes)
-        elif (cmd == KEY_REPORT_RESPONSE_CMD):
-            c = KeyReportResponsePacket.fromrawbytes(rawbytes)
-        else:
-            c = cls(cmd, rawbytes[1:])
+            if (cmd == LAYER_PRESS_CMD):
+                c = LayerPressPacket.fromrawbytes(rawbytes)
+            elif (cmd == LAYER_DEPRESS_CMD):
+                c = LayerDepressPacket.fromrawbytes(rawbytes)
+            elif (cmd == INIT_CMD):
+                c = InitializationPacket()
+            elif (cmd == SYNC_CMD):
+                c = SyncPacket()
+            elif (cmd == LIGHT_PULSE_CMD):
+                c = LightPulsePacket.fromrawbytes(rawbytes)
+            elif (cmd == KEY_REPORT_RESPONSE_CMD):
+                c = KeyReportResponsePacket.fromrawbytes(rawbytes)
+            else:
+                c = cls(cmd, rawbytes[1:])
 
         return c
 
@@ -389,27 +549,27 @@ class LightPulsePacket(DuMangPacket):
     def __init__(self, onoff, key):
         super().__init__(LIGHT_PULSE_CMD, None)
         self.onoff = 0x03 if onoff else 0x02
-        self.key = key
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
 
     @classmethod
     def fromrawbytes(cls, rawbytes):
         return cls(True if rawbytes[2] == 0x03 else False, rawbytes[1])
 
     def encode(self):
-        return [self.cmd, self.key, self.onoff, 0x0F, 0x0F, 0x0F]
+        return [self.cmd, self.key.encode(), self.onoff, 0x0F, 0x0F, 0x0F]
 
 class KeyReportRequestPacket(DuMangPacket):
     def __init__(self, key):
         super().__init__(KEY_REPORT_REQUEST_CMD, None)
-        self.key = key
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
 
     def encode(self):
-        return [self.cmd, self.key, 0x00, 0x00, 0x00]
+        return [self.cmd, self.key.encode(), 0x00, 0x00, 0x00]
 
 class KeyReportResponsePacket(DuMangPacket):
     def __init__(self, key, layer_keycodes):
         super().__init__(KEY_REPORT_RESPONSE_CMD, None)
-        self.key = key
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
         self.layer_keycodes = layer_keycodes
 
     @classmethod
@@ -417,63 +577,121 @@ class KeyReportResponsePacket(DuMangPacket):
         return cls(rawbytes[1], {0: Keycode(rawbytes[7]), 1: Keycode(rawbytes[8]), 2: Keycode(rawbytes[9]), 3: Keycode(rawbytes[10])})
 
     def __repr__(self):
-        return "{} - CMD:{:02X} Key:{:02X} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
+        return "{} - CMD:{:02X} Key:{} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
 
 class KeyConfigurePacket(DuMangPacket):
     def __init__(self, key, layer_keycodes):
         super().__init__(KEY_CONFIGURE_CMD, None)
-        self.key = key
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
         self.layer_keycodes = {k: v.encode() if isinstance(v, Keycode) else v for k, v in layer_keycodes.items()}
 
     def encode(self):
         return [self.cmd, 0x01, self.layer_keycodes[1], self.layer_keycodes[2], self.layer_keycodes[3], 0xFF, self.layer_keycodes[0]]
 
     def __repr__(self):
-        return "{} - CMD:{:02X} Key:{:02X} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
-
-def receive_thread(h, q):
-    while True:
-        p = read_packet(h)
-        if p:
-            logger.debug(p)
-            if q:
-                q.put(p)
-
-def send_thread(h, q):
-    while True:
-        p = q.get()
-        h.write(p.encode())
-        q.task_done()
+        return "{} - CMD:{:02X} Key:{} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
 
 def signal_handler(signal, frame):
     sys.exit(0)
 
-def read_packet(h):
-    d = h.read(64)
-    return DuMangPacket.parse(d)
-
 def initialize_devices():
     init_devices = []
 
-    try:
-        device_list = hid.enumerate(VENDOR_ID, PRODUCT_ID)
+    device_list = hid.enumerate(VENDOR_ID, PRODUCT_ID)
 
-        ctrl_device = []
-        for d in device_list:
-            # TODO: Is there some way to check version of firmware?
-            if d['interface_number'] == 1:
-                ctrl_device.append(d)
+    ctrl_device = []
+    for d in device_list:
+        # TODO: Is there some way to check version of firmware?
+        if d['interface_number'] == 1:
+            ctrl_device.append(d)
 
-        for d in ctrl_device:
+    for d in ctrl_device:
+        try:
             h = hid.device()
             h.open_path(d['path'])
-            h.write(InitializationPacket().encode())
-            init_devices.append(h)
+            b = DuMangBoard(d['serial_number'], h)
+            b.write_packet(InitializationPacket())
+            init_devices.append(b)
 
-    except IOError as ex:
-        # TODO: Better error handling.
-        logger.error(ex, exc_info=True)
-        logger.error("Likely permissions error.")
-        sys.exit(1)
+        except IOError as ex:
+            # TODO: Better error handling.
+            logger.error(ex, exc_info=True)
+            logger.error("Likely permissions error.")
 
     return init_devices
+
+class USBConnectionMonitor:
+    def __init__(self, vendor_id, product_id):
+        self.vendor_id = vendor_id
+        self.product_id = product_id
+        self.notify_q = queue.Queue()
+
+    def start(self):
+        self.notify_q.put('ready')
+
+    def get_status(self):
+        return self.notify_q.get()
+
+    def join(self):
+        pass
+
+class LinuxUSBConnectionMonitor(USBConnectionMonitor):
+    def __init__(self, vendor_id, product_id):
+        super().__init__(format(vendor_id, '04x'), format(product_id, '04x'))
+        self.context = pyudev.Context()
+        self.monitor = pyudev.Monitor.from_netlink(self.context)
+        self.monitor.filter_by(subsystem='usb')
+        self.observer = pyudev.MonitorObserver(self.monitor, callback=self.event_received, daemon=True)
+        # TODO: Check if already connected.
+        self.monitored_devices = []
+        self.notify_threshold = 2
+
+        for device in self.context.list_devices(subsystem='usb'):
+            if self._ismatch(device):
+                serial = device.attributes.asstring('serial')
+                print('Device connected {}'.format(serial))
+                self.monitored_devices.append(device)
+
+        if len(self.monitored_devices) >= self.notify_threshold:
+            self.notify_q.put('ready')
+
+
+    def _ismatch(self, device):
+        try:
+            vendor_id = device.attributes.asstring('idVendor')
+            product_id = device.attributes.asstring('idProduct')
+            serial = device.attributes.asstring('serial')
+            if vendor_id == self.vendor_id and product_id == self.product_id:
+                return True
+        except:
+            return False
+
+    def event_received(self, device):
+        vendor_id = ''
+        product_id = ''
+        serial = ''
+
+        if device.action == 'add':
+            try:
+                if self._ismatch(device):
+                    serial = device.attributes.asstring('serial')
+                    print('Device connected {}'.format(serial))
+                    self.monitored_devices.append(device)
+                    if len(self.monitored_devices) >= self.notify_threshold:
+                        self.notify_q.put('ready')
+            except:
+                pass
+
+        elif device.action == 'remove':
+            if device in self.monitored_devices:
+                print('Device disconnected')
+                self.monitored_devices.remove(device)
+                if len(self.monitored_devices) < self.notify_threshold:
+                    self.notify_q.put('wait')
+
+
+    def start(self):
+        self.observer.start()
+
+    def join(self):
+        self.observer.join()

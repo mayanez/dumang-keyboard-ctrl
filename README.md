@@ -4,6 +4,8 @@ This is an open-source toolset for use with the DuMang DK6 line of keyboards.
 
 These keyboards are fully programmable and support multiple layers.
 
+It is currently only support for Linux, but will eventually support other platforms.
+
 ## Install
 
 ### Dependencies
@@ -18,7 +20,7 @@ These keyboards are fully programmable and support multiple layers.
 
 ### Python
 
-    $ pip install hidapi docopt PyQt5
+    $ pip install hidapi pyudev docopt PyQt5
 
 For correct functionality under Linux, you need to copy the udev file provided in this repo into the appropriate directory for you distro. You might then need to call `udevadm control --reload-rules` to reload the rules.
 
@@ -30,7 +32,7 @@ In progress.
 
 ### Sync Tool
 
-The `dumang_sync.py` is a daemon process that can be used to sync the two keyboard halves.
+The `dumang_sync.py` is a daemon process that can be used to sync the two keyboard halves for layer functionality. 
 
 You may want to setup this tool to run at startup. Depending on your distribution `systemd` is a likely solution. See https://github.com/arjun024/systemd-example-startup for an example.
 

@@ -1,5 +1,16 @@
-key_00:
-  layer_0: SEVEN
-  layer_1: EIGHT
-  layer_2: NINE
-  layer_3: ZERO
+kb1:
+  serial: 05DAFF313737584D43237533
+  keys:
+    key_00:
+      layer_0: SEVEN
+      layer_1: EIGHT
+      layer_2: NINE
+      layer_3: ZERO
+kb2:
+  serial: 05D5FF313737584D43237109
+  keys:
+    key_00:
+      layer_0: END
+      layer_1: EIGHT
+      layer_2: NINE
+      layer_3: ZERO
