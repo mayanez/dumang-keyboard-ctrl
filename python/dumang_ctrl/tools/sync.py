@@ -1,6 +1,6 @@
 import logging
 import pyudev
-from dumang_common import *
+from dumang_ctrl.dumang.common import *
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +86,8 @@ def device_init_thread(monitor):
             kbd1.close()
             kbd2.close()
 
-if __name__ == "__main__":
-
+def main():
+    logger.info('Staring DuMang Layer Sync...')
     signal.signal(signal.SIGINT, signal_handler)
 
     if sys.platform.startswith("linux"):
@@ -103,3 +103,6 @@ if __name__ == "__main__":
     t.join()
 
     monitor.join()
+
+if __name__ == "__main__":
+    main()
