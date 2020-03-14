@@ -1,4 +1,11 @@
-# Python Version
+# DuMang DK6 Keyboard Programming Tools
+
+This is an open-source toolset for use with the DuMang DK6 line of keyboards from Beyong Q (www.beyondq.com/).
+
+These keyboards are fully programmable and support multiple layers.
+
+It is currently only support for Linux, but will eventually support other
+platforms.
 
 ## Install
 
