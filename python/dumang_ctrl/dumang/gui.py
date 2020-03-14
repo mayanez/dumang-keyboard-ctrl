@@ -3,7 +3,7 @@ import sys
 from PyQt5 import uic, QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QComboBox, QVBoxLayout, QWidget, QLabel
 from collections import defaultdict
-from common import *
+from .common import *
 
 pulse_onoff = defaultdict(lambda: False)
 
