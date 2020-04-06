@@ -463,7 +463,7 @@ class DuMangBoard:
                     self._keys_initialized = True
                     break
 
-        return self._configured_keys.values()
+        return self._configured_keys
 
 class DuMangPacket:
     def __init__(self, cmd, rawbytes):

@@ -27,15 +27,11 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler())
 
-def init_send_threads(kbd1, kbd2):
-    s1 = Job(target=kbd1.send_thread, daemon=True)
-    s2 = Job(target=kbd2.send_thread, daemon=True)
-    return [s1, s2]
+def init_send_threads(kbds):
+    return [Job(target=kbd.send_thread, daemon=True) for kbd in kbds]
 
-def init_receive_threads(kbd1, kbd2):
-    r1 = Job(target=kbd1.receive_thread, daemon=True)
-    r2 = Job(target=kbd2.receive_thread, daemon=True)
-    return [r1, r2]
+def init_receive_threads(kbds):
+    return [Job(target=kbd.receive_thread, daemon=True) for kbd in kbds]
 
 def configure_keys(cfg, b):
     for k in cfg:
@@ -58,38 +54,37 @@ def main():
     threads = []
     signal.signal(signal.SIGINT, signal_handler)
 
-    # TODO: Handle if both not connected.
     # TODO: Can both config and sync tools run at the same time?
-    kbd1, kbd2 = initialize_devices()
+    kbds = initialize_devices()
 
-    threads.extend(init_send_threads(kbd1, kbd2))
-    threads.extend(init_receive_threads(kbd1, kbd2))
+    threads.extend(init_send_threads(kbds))
+    threads.extend(init_receive_threads(kbds))
 
     for t in threads:
         t.start()
 
     if arguments['dump']:
         configured_keys = []
-        configured_keys.extend(kbd1.configured_keys)
-        configured_keys.extend(kbd2.configured_keys)
+        for kbd in kbds:
+            configured_keys.extend(kbd.configured_keys)
         logging.info('{} keys configured.'.format(len(configured_keys)))
         sys.exit(0)
     elif arguments['config']:
         ymlfile = open(arguments['<file>'], 'r')
         cfg = yaml.load(ymlfile)
-        configure_board(cfg, kbd1)
-        configure_board(cfg, kbd2)
+        for kbd in kbds:
+            configure_board(cfg, kbd)
         logging.info('Configured.')
         sys.exit(0)
     elif arguments['gui']:
         logging.info('Launching GUI')
-        inspect_gui(kbd1, kbd2)
+        inspect_gui(*kbds)
     elif arguments['inspect']:
         # TODO: Implement
         # TODO: How to match pressed key with config...might need to track layer state to match against configured keycode:/
         configured_keys = []
-        configured_keys.extend(kbd1.configured_keys)
-        configured_keys.extend(kbd2.configured_keys)
+        for kbd in kbds:
+            configured_keys.extend(kbd.configured_keys)
         print('print pressed key config to console')
 
     for t in threads:
