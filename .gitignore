@@ -31,3 +31,6 @@ __pypackages__/
 
 # Environments
 venv/
+
+# VSCode
+.vscode
