@@ -4,9 +4,7 @@ import signal
 import queue
 import threading
 import logging
-
-if sys.platform.startswith("linux"):
-    import pyudev
+import usb1
 
 logger = logging.getLogger(__name__)
 
@@ -620,14 +618,105 @@ def initialize_devices():
 
     return init_devices
 
+class NoHotplugSupport(Exception):
+    pass
+
+class TooManyBoards(Exception):
+    pass
+
+class DetectedDevice(object):
+    onClose = lambda device: None
+
+    def __init__(self, handle):
+        self._handle = handle
+
+    def __str__(self):
+        # For demonstration purposes only.
+        return 'USB Detected Device at ' + str(self._handle.getDevice())
+
+    def close(self):
+        # Note: device may have already left when this method is called,
+        # so catch USBErrorNoDevice around cleanup steps involving the device.
+        try:
+            self.onClose(self)
+            # Put device in low-power mode, release claimed interfaces...
+            pass
+        except usb1.USBErrorNoDevice:
+            pass
+        self._handle.close()
+
 class USBConnectionMonitor:
+    """
+    Manages the hotplug events.
+    Monitors the arrival and departure of USB devices.
+    """
     def __init__(self, vendor_id, product_id):
+        self.context = usb1.USBContext()
+        if not self.context.hasCapability(usb1.CAP_HAS_HOTPLUG):
+            raise NoHotplugSupport(
+                'Hotplug support is missing. Please update your libusb version.'
+            )
+        self._device_dict = {}
         self.vendor_id = vendor_id
         self.product_id = product_id
         self.notify_q = queue.Queue()
+        self._notify_threshold = 2
 
-    def start(self):
+    def _on_device_left(self, detected_device):
+        print('Device left:', str(detected_device))
+
+    def _on_device_arrived(self, detected_device):
+        detected_device.onClose = self._on_device_left
+        print('Device arrived:', str(detected_device))
+
+    def _register_callback(self):
+        self.context.hotplugRegisterCallback(
+            self._on_hotplug_event,
+            # Just in case more events are added in the future.
+            events=usb1.HOTPLUG_EVENT_DEVICE_ARRIVED | usb1.HOTPLUG_EVENT_DEVICE_LEFT,
+            # Edit these if you handle devices from a single vendor, of a
+            # single product type or of a single device class; and simplify
+            # device filtering accordingly in _on_hotplug_event.
+            vendor_id=self.vendor_id,
+            product_id=self.product_id,
+            #dev_class=,
+        )
+
+    def _on_hotplug_event(self, context, device, event):
+        if event == usb1.HOTPLUG_EVENT_DEVICE_LEFT:
+            device_from_event = self._device_dict.pop(device, None)
+            self._update_status()
+            if device_from_event is not None:
+                device_from_event.close()
+            return
+        try:
+            handle = device.open()
+        except usb1.USBError:
+            return
+        detected_device = DetectedDevice(handle)
+        if self._on_device_arrived(detected_device):
+            detected_device.close()
+            return
+        self._device_dict[device] = detected_device
+        self._update_status()
+    
+    def _update_status(self):
+        total_connected = len(self._device_dict)
+        if total_connected == self._notify_threshold:
+            self.ready()
+        elif total_connected < self._notify_threshold:
+            self.wait()
+        else:
+            raise TooManyBoards(
+                'Too many boards connected. Not sure how to handle it.'
+            )
+
+
+    def ready(self):
         self.notify_q.put('ready')
+    
+    def wait(self):
+        self.notify_q.put('wait')
 
     def get_status(self):
         return self.notify_q.get()
@@ -635,63 +724,26 @@ class USBConnectionMonitor:
     def join(self):
         pass
 
-class LinuxUSBConnectionMonitor(USBConnectionMonitor):
+class USBConnectionMonitorRunner(USBConnectionMonitor):
+    """
+    API: USB-event-centric application.
+    Simplest API, for userland drivers which only react to USB events.
+    """
     def __init__(self, vendor_id, product_id):
-        super().__init__(format(vendor_id, '04x'), format(product_id, '04x'))
-        self.context = pyudev.Context()
-        self.monitor = pyudev.Monitor.from_netlink(self.context)
-        self.monitor.filter_by(subsystem='usb')
-        self.observer = pyudev.MonitorObserver(self.monitor, callback=self.event_received, daemon=True)
-        # TODO: Check if already connected.
-        self.monitored_devices = []
-        self.notify_threshold = 2
-
-        for device in self.context.list_devices(subsystem='usb'):
-            if self._ismatch(device):
-                serial = device.attributes.asstring('serial')
-                print('Device connected {}'.format(serial))
-                self.monitored_devices.append(device)
-
-        if len(self.monitored_devices) >= self.notify_threshold:
-            self.notify_q.put('ready')
+        super().__init__(vendor_id, product_id)
+        self._observer = threading.Thread(target=self._run, daemon=True)
 
 
-    def _ismatch(self, device):
-        try:
-            vendor_id = device.attributes.asstring('idVendor')
-            product_id = device.attributes.asstring('idProduct')
-            serial = device.attributes.asstring('serial')
-            if vendor_id == self.vendor_id and product_id == self.product_id:
-                return True
-        except:
-            return False
-
-    def event_received(self, device):
-        vendor_id = ''
-        product_id = ''
-        serial = ''
-
-        if device.action == 'add':
-            try:
-                if self._ismatch(device):
-                    serial = device.attributes.asstring('serial')
-                    print('Device connected {}'.format(serial))
-                    self.monitored_devices.append(device)
-                    if len(self.monitored_devices) >= self.notify_threshold:
-                        self.notify_q.put('ready')
-            except:
-                pass
-
-        elif device.action == 'remove':
-            if device in self.monitored_devices:
-                print('Device disconnected')
-                self.monitored_devices.remove(device)
-                if len(self.monitored_devices) < self.notify_threshold:
-                    self.notify_q.put('wait')
-
+    def _run(self):
+        with self.context:
+            print('Registering hotplug callback...')
+            self._register_callback()
+            while True:
+                self.context.handleEvents()
 
     def start(self):
-        self.observer.start()
-
+        self._observer.start()
+    
     def join(self):
-        self.observer.join()
+        if self._observer:
+            self._observer.join()

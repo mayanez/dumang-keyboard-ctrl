@@ -90,18 +90,13 @@ def main():
     logger.info('Staring DuMang Layer Sync...')
     signal.signal(signal.SIGINT, signal_handler)
 
-    if sys.platform.startswith("linux"):
-        monitor = LinuxUSBConnectionMonitor(VENDOR_ID, PRODUCT_ID)
-    else:
-        # Does nothing.
-        monitor = USBConnectionMonitor(VENDOR_ID, PRODUCT_ID)
-
-    monitor.start()
-
+    monitor = USBConnectionMonitorRunner(VENDOR_ID, PRODUCT_ID)
     t = threading.Thread(target=device_init_thread, args=(monitor, ), daemon=True)
+    
+    monitor.start()
     t.start()
-    t.join()
 
+    t.join()
     monitor.join()
 
 if __name__ == "__main__":
