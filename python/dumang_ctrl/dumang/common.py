@@ -661,6 +661,7 @@ class USBConnectionMonitor:
         self.product_id = product_id
         self.notify_q = queue.Queue()
         self._notify_threshold = 2
+        self._has_started = False
 
     def _on_device_left(self, detected_device):
         print('Device left:', str(detected_device))
@@ -703,9 +704,11 @@ class USBConnectionMonitor:
     def _update_status(self):
         total_connected = len(self._device_dict)
         if total_connected == self._notify_threshold:
+            self._has_started = True
             self.ready()
         elif total_connected < self._notify_threshold:
-            self.wait()
+            if(self._has_started):
+                self.wait()
         else:
             raise TooManyBoards(
                 'Too many boards connected. Not sure how to handle it.'
