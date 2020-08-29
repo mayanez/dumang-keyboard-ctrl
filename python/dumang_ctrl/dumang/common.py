@@ -29,7 +29,6 @@ KBD_2_ID = 0x0D
 MAX_KEYS = 256
 UNKNOWN_KEYCODE_STR = "UNKNOWN"
 
-# TODO: This needs to take into account DuMang LT/FN keys.
 class Keycode:
     A = 0x04
     """``a`` and ``A``"""
@@ -289,6 +288,33 @@ class Keycode:
     RIGHT_GUI = 0xE7
     """GUI modifier right of the spacebar"""
 
+    LAYER_0 = 0xD0
+    """Change to keyboard Layer 0""" 
+    LAYER_1 = 0xD1
+    """Change to keyboard Layer 1""" 
+    LAYER_2 = 0xD2
+    """Change to keyboard Layer 2""" 
+    LAYER_3 = 0xD3
+    """Change to keyboard Layer 3"""
+
+    LAYER_TOGGLE_0 = 0xD4
+    """Change while pressing to keyboard Layer 0""" 
+    LAYER_TOGGLE_1 = 0xD5
+    """Change while pressing to keyboard Layer 1""" 
+    LAYER_TOGGLE_2 = 0xD6
+    """Change while pressing to keyboard Layer 2""" 
+    LAYER_TOGGLE_3 = 0xD6
+    """Change while pressing to keyboard Layer 3"""
+
+    LAYER_KEY_0 = 0xDC
+    """Change when long pressing to keyboard Layer 0""" 
+    LAYER_KEY_1 = 0xDD
+    """Change when long pressing to keyboard Layer 1""" 
+    LAYER_KEY_2 = 0xDE
+    """Change when long pressing to keyboard Layer 2""" 
+    LAYER_KEY_3 = 0xDF
+    """Change when long pressing to keyboard Layer 3"""
+    
     def __init__(self, keycode):
         self.keycode = keycode
         self.keystr = UNKNOWN_KEYCODE_STR
