@@ -1,0 +1,28 @@
+# Maintainer: maarroyo <archlinux@arroyo.me>
+
+_pkgname=dumang-keyboard-ctrl
+pkgname=$_pkgname-git
+pkgver=e394a06ba504cd5789d4436d00f89398cdddd143
+pkgrel=1
+pkgdesc="DuMang DK6 Keyboard Programming Tools"
+arch=('any')
+url="https://github.com/mayanez/dumang-keyboard-ctrl"
+license=('MIT')
+depends=('python' 'python-setuptools' 'libusb' 'qt5-base' 'hidapi')
+makedepends=('git')
+provides=($_pkgname)
+conflicts=($_pkgname)
+source=($pkgname::git+https://github.com/mayanez/dumang-keyboard-ctrl.git)
+md5sums=('SKIP')
+
+pkgver() {
+  cd $pkgname
+  git log --format="%H" -n 1
+}
+
+package() {
+  cd $pkgname
+  python setup.py install --root="$pkgdir" --optimize=1
+  install -Dm644 udev/51-dumang.rules "$pkgdir/lib/udev/rules.d/51-dumang.rules" || return 1
+  install -Dm644 systemd/dumang-sync.service "$pkgdir/usr/lib/systemd/system/dumang-sync.service" || return 1
+}

@@ -27,17 +27,7 @@ It currently supports:
 
 ### Dependencies
 
-#### Debian/Ubuntu
-
-    $ apt-get install libusb-1.0.0-dev libudev qtbase5-dev
-
-#### Arch Linux
-
-    $ pacman -S libusb qt5-base
-
-#### Python
-
-    $ pip install hidapi pyudev docopt PyQt5
+Please see the corresponding files in the `install` directory.
 
 ## Tools
 
