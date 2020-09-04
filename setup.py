@@ -10,7 +10,7 @@ README = (HERE / "README.md").read_text()
 # This call to setup() does all the work
 setuptools.setup(
     name="dumang_ctrl",
-    version="0.0.2",
+    version="0.0.3",
     description="Dumang DK6 Tools",
     long_description=README,
     long_description_content_type="text/markdown",
@@ -21,11 +21,11 @@ setuptools.setup(
     classifiers=[
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
     ],
     packages=setuptools.find_packages(),
     include_package_data=True,
-    install_requires=["docopt", "pyudev", "hidapi", "PyQt5"],
+    install_requires=["docopt", "hidapi", "PyQt5", "PyYAML", "libusb1"],
     entry_points={
         "console_scripts": [
             "dumang-sync = dumang_ctrl.tools.sync:main",

@@ -5,6 +5,7 @@ import queue
 import threading
 import logging
 import usb1
+import yaml
 
 logger = logging.getLogger(__name__)
 
