@@ -67,3 +67,5 @@ It works as follows:
  - Each key can be assigned up to 4 layers (eg. `layer_0` - `layer_3`).
 
 To identify both the `serial` and key module ID you'll want to use the GUI. Once you've figured out your `config.yml` you can use `dumang-config config config.yml` to flash the keyboard halves. It will only write the keys that are specified in the file, all other keys will be unaffected. 
+
+You can generate a dump of your current config with `dumang-config dump > myconfig.yml`.

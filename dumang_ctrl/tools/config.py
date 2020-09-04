@@ -17,6 +17,7 @@ import threading
 import logging
 import yaml
 from docopt import docopt
+from collections import OrderedDict
 
 from dumang_ctrl.dumang.common import *
 # TODO: Import only if using gui.
@@ -26,6 +27,13 @@ logger = logging.getLogger(__name__)
 
 logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler())
+
+class NestedDict(OrderedDict):
+    def __missing__(self, key):
+        self[key] = NestedDict()
+        return self[key]
+
+yaml.add_representer(NestedDict, yaml.representer.Representer.represent_dict)
 
 def init_send_threads(kbds):
     return [Job(target=kbd.send_thread, daemon=True) for kbd in kbds]
@@ -67,10 +75,13 @@ def main():
         t.start()
 
     if arguments['dump']:
-        configured_keys = []
-        for kbd in kbds:
-            configured_keys.extend(kbd.configured_keys)
-        logging.info('{} keys configured.'.format(len(configured_keys)))
+        cfg_yml = NestedDict()
+        for i, kbd in enumerate(kbds):
+            cfg_yml['kbd_{}'.format(i)]['serial'] = kbd.serial
+            for _, dkm in kbd.configured_keys.items():
+                for l, kc in dkm.layer_keycodes.items():
+                    cfg_yml['kbd_{}'.format(i)]['keys']['key_{}'.format(dkm.key)]['layer_{}'.format(l)] = str(kc)
+        yaml.dump(cfg_yml, sys.stdout, allow_unicode=True, default_flow_style=False, sort_keys=False)
         sys.exit(0)
     elif arguments['config']:
         ymlfile = open(arguments['<file>'], 'r')

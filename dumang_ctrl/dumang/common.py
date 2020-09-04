@@ -344,6 +344,15 @@ class Keycode:
                 if not callable(value):
                     if keystr == attribute:
                         return cls(value)
+    @classmethod
+    def keys(cls):
+        result = []
+        for attribute in Keycode.__dict__.keys():
+            if attribute[:2] != '__':
+                value = getattr(Keycode, attribute)
+                if not callable(value):
+                    result.append(attribute)
+        return result
 
     def encode(self):
         return self.keycode
@@ -484,7 +493,7 @@ class DuMangBoard:
                                 if kc.keystr is not UNKNOWN_KEYCODE_STR:
                                     # NOTE: We add the layer_keycodes to the DKM
                                     p.key.layer_keycodes = p.layer_keycodes
-                                    self._configured_keys[p.key.key] = p.key
+                                    self._configured_keys[p.key.key] = DuMangKeyModule(p.key, p.layer_keycodes)
                     self._keys_initialized = True
                     break
 

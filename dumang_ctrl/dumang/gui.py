@@ -58,11 +58,11 @@ class KBDTableView(QTableWidget):
         return QTableWidget.eventFilter(self, widget, event)
 
     def _on_itemEntered(self, kbd, item):
-        p = LightPulsePacket(True, self.keys[int(self.item(item.row(), 0).data(0), 16)])
+        p = LightPulsePacket(True, self.keys[int(self.item(item.row(), 0).data(0), 16)].key)
         kbd.put(p)
 
     def _on_itemExited(self, kbd, item):
-        p = LightPulsePacket(False, self.keys[int(self.item(item.row(), 0).data(0), 16)])
+        p = LightPulsePacket(False, self.keys[int(self.item(item.row(), 0).data(0), 16)].key)
         kbd.put(p)
 
 class KBDWidget(QWidget):
