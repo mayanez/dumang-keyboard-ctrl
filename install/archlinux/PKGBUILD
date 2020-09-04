@@ -23,11 +23,8 @@ pkgver() {
 package() {
   cd $pkgname
   python setup.py install --root="$pkgdir" --optimize=1
-  install -Dm644 udev/51-dumang.rules "$pkgdir/lib/udev/rules.d/51-dumang.rules" || return 1
+  install -Dm644 udev/51-dumang.rules "$pkgdir/usr/lib/udev/rules.d/51-dumang.rules" || return 1
   install -Dm644 systemd/dumang-sync.service "$pkgdir/usr/lib/systemd/system/dumang-sync.service" || return 1
-}
-
-post_install() {
-  echo '==> You might want to enable the sync service with the command "systemctl enable dumang-sync.service".' 
+  install=dumang-service.install
 }
 
