@@ -57,3 +57,13 @@ The `inspect` command launches a GUI that you can use to toggle the LED for a pa
 or 
 
     $ python -m dumang_ctrl.tools.config
+
+#### Usage
+A minimal example `config.yml` file is included at the top of the repo.
+
+It works as follows:
+ - The `serial` corresponds to the unique identifier for each keyboard half.
+ - Under `keys` you can list out the configuration you want to override for each key according to it's unique key module ID (eg. `key_00` in the example).
+ - Each key can be assigned up to 4 layers (eg. `layer_0` - `layer_3`).
+
+To identify both the `serial` and key module ID you'll want to use the GUI. Once you've figured out your `config.yml` you can use `dumang-config config config.yml` to flash the keyboard halves. It will only write the keys that are specified in the file, all other keys will be unaffected. 
