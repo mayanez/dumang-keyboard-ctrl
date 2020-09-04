@@ -639,9 +639,9 @@ def initialize_devices():
             init_devices.append(b)
 
         except IOError as ex:
-            # TODO: Better error handling.
             logger.error(ex, exc_info=True)
             logger.error("Likely permissions error.")
+            sys.exit(1)
 
     return init_devices
 

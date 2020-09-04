@@ -56,6 +56,9 @@ def main():
 
     # TODO: Can both config and sync tools run at the same time?
     kbds = initialize_devices()
+    if not kbds:
+        logging.error('Keyboard not detected')
+        sys.exit(1)
 
     threads.extend(init_send_threads(kbds))
     threads.extend(init_receive_threads(kbds))
