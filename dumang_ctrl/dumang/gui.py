@@ -7,8 +7,7 @@ from collections import defaultdict
 from .common import *
 
 class KBDTableView(QTableWidget):
-    cellExited = pyqtSignal(int, int)
-    itemExited = pyqtSignal(QTableWidgetItem)
+    itemLeave = pyqtSignal()
 
     HEADERS = ['Keycode', 'Layer 0', 'Layer 1', 'Layer 2', 'Layer 3']
 
@@ -18,7 +17,7 @@ class KBDTableView(QTableWidget):
         self.setData()
         self.resizeColumnsToContents()
         self.resizeRowsToContents()
-        self._last_index = QPersistentModelIndex()
+        self._last_item = None
         self.viewport().installEventFilter(self)
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().setStretchLastSection(True)
@@ -42,28 +41,29 @@ class KBDTableView(QTableWidget):
 
     def eventFilter(self, widget, event):
         if widget is self.viewport():
-            index = self._last_index
-            if event.type() == QEvent.MouseMove:
-                index = self.indexAt(event.pos())
-            elif event.type() == QEvent.Leave:
+            if event.type() == QEvent.Leave:
                 index = QModelIndex()
-            if index != self._last_index:
-                row = self._last_index.row()
-                column = self._last_index.column()
-                item = self.item(row, column)
-                if item is not None:
-                    self.itemExited.emit(item)
-                self.cellExited.emit(row, column)
-                self._last_index = QPersistentModelIndex(index)
+                self.itemLeave.emit()
+                return True
+
         return QTableWidget.eventFilter(self, widget, event)
 
     def _on_itemEntered(self, kbd, item):
+        # NOTE: The lack of itemLeave/Exited requires us to track last item.
+        # Previous solution as descriped in https://stackoverflow.com/questions/20064975
+        # proved problematic when scrolling as it would trigger Enter events, but no Leave events.
+        if item != self._last_item and self._last_item is not None:
+            p = LightPulsePacket(False, self.keys[int(self.item(self._last_item.row(), 0).data(0), 16)].key)
+            kbd.put(p)
+
         p = LightPulsePacket(True, self.keys[int(self.item(item.row(), 0).data(0), 16)].key)
         kbd.put(p)
+        self._last_item = item
 
-    def _on_itemExited(self, kbd, item):
-        p = LightPulsePacket(False, self.keys[int(self.item(item.row(), 0).data(0), 16)].key)
+    def _on_itemLeave(self, kbd):
+        p = LightPulsePacket(False, self.keys[int(self.item(self._last_item.row(), 0).data(0), 16)].key)
         kbd.put(p)
+
 
 class KBDWidget(QWidget):
     def __init__(self, parent, kbd):
@@ -75,9 +75,9 @@ class KBDWidget(QWidget):
     
     def _add_table_widget(self, kbd):
         kbd_widget = KBDTableView(kbd.configured_keys)
-        kbd_widget.setMouseTracking(1)
+        kbd_widget.setMouseTracking(True)
         kbd_widget.itemEntered.connect(lambda item: kbd_widget._on_itemEntered(kbd, item))
-        kbd_widget.itemExited.connect(lambda item: kbd_widget._on_itemExited(kbd, item))
+        kbd_widget.itemLeave.connect(lambda: kbd_widget._on_itemLeave(kbd))
         return kbd_widget
     
     def hideLayout(self, n):
@@ -96,7 +96,7 @@ class KBDTab(QWidget):
         self.layout.addWidget(self.kbd_label)
 
         # Add dropdown/combo box
-        headers = [f'Layout {i}' for i in range(4)]
+        headers = [f'Layer {i}' for i in range(MAX_LAYERS)]
         self.comboLayouts = QComboBox()
         self.comboLayouts.addItems(headers)
         self.label = QLabel("&L:")
