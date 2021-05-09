@@ -1,5 +1,4 @@
 import logging
-import pyudev
 from dumang_ctrl.dumang.common import *
 
 logger = logging.getLogger(__name__)
