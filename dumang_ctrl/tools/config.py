@@ -88,8 +88,8 @@ def main():
         cfg = yaml.safe_load(ymlfile)
         for kbd in kbds:
             configure_board(cfg, kbd)
+            kbd.kill_threads()
         logging.info('Configured.')
-        sys.exit(0)
     elif arguments['gui']:
         logging.info('Launching GUI')
         inspect_gui(*kbds)
