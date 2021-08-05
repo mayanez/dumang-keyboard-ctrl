@@ -427,6 +427,7 @@ class DuMangBoard:
         self._configured_keys = {}
         self.send_q = queue.Queue()
         self.recv_q = queue.Queue()
+        self.should_stop = False
 
     def write(self, rawbytes):
         self.handle.write(rawbytes)
@@ -465,6 +466,7 @@ class DuMangBoard:
     def kill_threads(self):
         self.send_q.put(JobKiller())
         self.recv_q.put(JobKiller())
+        self.should_stop = True
 
     def receive_thread(self):
         p = self.read_packet()
@@ -472,6 +474,9 @@ class DuMangBoard:
         if p:
             logger.debug(p)
             self.recv_q.put(p)
+
+        if self.should_stop:
+            sys.exit(0)
 
     def send_thread(self):
         p = self.send_q.get()
