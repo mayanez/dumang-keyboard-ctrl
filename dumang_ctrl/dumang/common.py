@@ -490,11 +490,10 @@ class DuMangBoard:
                     while not self.recv_q.empty():
                         p = self.recv_q.get()
                         if isinstance(p, KeyReportResponsePacket):
-                            for l, kc in p.layer_keycodes.items():
-                                if kc.keystr is not UNKNOWN_KEYCODE_STR:
-                                    # NOTE: We add the layer_keycodes to the DKM
-                                    p.key.layer_keycodes = p.layer_keycodes
-                                    self._configured_keys[p.key.key] = DuMangKeyModule(p.key, p.layer_keycodes)
+                            if any([kc.keycode != 0 for kc in p.layer_keycodes.values()]):
+                                # NOTE: We add the layer_keycodes to the DKM
+                                p.key.layer_keycodes = p.layer_keycodes
+                                self._configured_keys[p.key.key] = DuMangKeyModule(p.key, p.layer_keycodes)
                     self._keys_initialized = True
                     break
 
