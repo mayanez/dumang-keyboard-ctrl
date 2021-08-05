@@ -85,7 +85,7 @@ def main():
         sys.exit(0)
     elif arguments['config']:
         ymlfile = open(arguments['<file>'], 'r')
-        cfg = yaml.load(ymlfile)
+        cfg = yaml.safe_load(ymlfile)
         for kbd in kbds:
             configure_board(cfg, kbd)
         logging.info('Configured.')
