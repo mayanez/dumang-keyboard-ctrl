@@ -43,7 +43,7 @@ def init_receive_threads(kbds):
 
 def configure_keys(cfg, b):
     for k in cfg:
-        key = int(k.split('_')[1])
+        key = int(k.split('_')[1], 16)
         layer_keycodes = {}
         for l in cfg[k]:
             layer = int(l.split('_')[1])
