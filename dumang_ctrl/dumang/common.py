@@ -628,7 +628,7 @@ class KeyConfigurePacket(DuMangPacket):
         self.layer_keycodes = {k: v.encode() if isinstance(v, Keycode) else v for k, v in layer_keycodes.items()}
 
     def encode(self):
-        return [self.cmd, 0x01, self.layer_keycodes[1], self.layer_keycodes[2], self.layer_keycodes[3], 0xFF, self.layer_keycodes[0]]
+        return [self.cmd, self.key.encode() + 1, self.layer_keycodes[1], self.layer_keycodes[2], self.layer_keycodes[3], 0xFF, self.layer_keycodes[0]]
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
