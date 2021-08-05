@@ -327,6 +327,8 @@ class Keycode:
                 if not callable(value):
                     if self.keycode == value:
                         self.keystr = attribute
+        if self.keystr is UNKNOWN_KEYCODE_STR:
+            self.keystr = f"UNKNOWN_{self.keycode:02X}"
 
     def __lt__(self, other):
         return self.keycode < other.keycode
