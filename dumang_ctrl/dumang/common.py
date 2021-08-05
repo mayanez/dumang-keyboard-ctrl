@@ -316,6 +316,12 @@ class Keycode:
     """Change when long pressing to keyboard Layer 2""" 
     LAYER_KEY_3 = 0xDF
     """Change when long pressing to keyboard Layer 3"""
+
+    TRANSPARENT = 0xFF
+    """Transparent"""
+
+    DISABLED = 0xFE
+    """Disabled"""
     
     def __init__(self, keycode):
         self.keycode = keycode
