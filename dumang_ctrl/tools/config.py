@@ -46,10 +46,20 @@ def configure_keys(cfg, b):
         key = int(k.split('_')[1], 16)
         layer_keycodes = {}
         for l in cfg[k]:
+            if not l.startswith("layer_"):
+                continue
             layer = int(l.split('_')[1])
             layer_keycodes[layer] = Keycode.fromstr(cfg[k][l])
 
         b.put(KeyConfigurePacket(key, layer_keycodes))
+
+        macro = cfg[k].get("macro")
+        if macro:
+            idx = 0
+            for m in macro:
+                b.put(MacroConfigurePacket(key, idx, MacroType.fromstr(m["type"]), Keycode.fromstr(m["key"]), int(m["delay_ms"])))
+                idx += 1
+            b.put(MacroConfigurePacket(key, idx, MacroType(0), Keycode(0), 0))
 
 def configure_board(cfg, b):
     for kbd in cfg:

@@ -23,6 +23,7 @@ KEY_REPORT_RESPONSE_CMD = 0x05
 KEY_CONFIGURE_CMD = 0x09
 MACRO_REPORT_REQUEST_CMD = 0x42
 MACRO_REPORT_RESPONSE_CMD = 0x43
+MACRO_CONFIGURE_CMD = 0x40
 
 MACRO_MIN_IDX = 0x05
 MACRO_MAX_IDX = 0x45
@@ -708,6 +709,21 @@ class MacroReportResponsePacket(DuMangPacket):
     @classmethod
     def fromrawbytes(cls, rawbytes):
         return cls(rawbytes[1], rawbytes[2] - MACRO_MIN_IDX, MacroType(rawbytes[3]), Keycode(rawbytes[4]), rawbytes[5] * 256 + rawbytes[6])
+
+    def __repr__(self):
+        return "{} - CMD:{:02X} Key:{} Idx:{} Type:{} Keycode:{} Delay:{}".format(self.__class__.__name__, self.cmd, self.key, self.idx, self.type, self.keycode, self.delay)
+
+class MacroConfigurePacket(DuMangPacket):
+    def __init__(self, key, idx, type_, keycode, delay):
+        super().__init__(MACRO_CONFIGURE_CMD, None)
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
+        self.idx = idx
+        self.type = type_
+        self.keycode = keycode
+        self.delay = delay
+
+    def encode(self):
+        return [self.cmd, self.key.encode(), self.idx + MACRO_MIN_IDX, self.type.type, self.keycode.keycode, self.delay // 256, self.delay % 256]
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} Idx:{} Type:{} Keycode:{} Delay:{}".format(self.__class__.__name__, self.cmd, self.key, self.idx, self.type, self.keycode, self.delay)
