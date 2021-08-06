@@ -32,6 +32,9 @@ MAX_LAYERS = 4
 UNKNOWN_KEYCODE_STR = "UNKNOWN"
 
 class Keycode:
+    MACRO = 0x03
+    """Macro"""
+
     A = 0x04
     """``a`` and ``A``"""
     B = 0x05
