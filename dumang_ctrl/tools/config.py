@@ -81,8 +81,8 @@ def main():
             for _, dkm in kbd.configured_keys.items():
                 for l, kc in dkm.layer_keycodes.items():
                     cfg_yml['kbd_{}'.format(i)]['keys']['key_{}'.format(dkm.key)]['layer_{}'.format(l)] = str(kc)
+            kbd.kill_threads()
         yaml.dump(cfg_yml, sys.stdout, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        sys.exit(0)
     elif arguments['config']:
         ymlfile = open(arguments['<file>'], 'r')
         cfg = yaml.safe_load(ymlfile)
