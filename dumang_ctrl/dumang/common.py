@@ -21,6 +21,11 @@ LIGHT_PULSE_CMD = 0x2A
 KEY_REPORT_REQUEST_CMD = 0x04
 KEY_REPORT_RESPONSE_CMD = 0x05
 KEY_CONFIGURE_CMD = 0x09
+MACRO_REPORT_REQUEST_CMD = 0x42
+MACRO_REPORT_RESPONSE_CMD = 0x43
+
+MACRO_MIN_IDX = 0x05
+MACRO_MAX_IDX = 0x45
 
 VENDOR_ID = 0x0483
 PRODUCT_ID = 0x5710
@@ -30,6 +35,7 @@ KBD_2_ID = 0x0D
 MAX_KEYS = 256
 MAX_LAYERS = 4
 UNKNOWN_KEYCODE_STR = "UNKNOWN"
+UNKNOWN_MACROTYPE_STR = "UNKNOWN"
 
 class Keycode:
     MACRO = 0x03
@@ -356,6 +362,7 @@ class Keycode:
                 if not callable(value):
                     if keystr == attribute:
                         return cls(value)
+
     @classmethod
     def keys(cls):
         result = []
@@ -371,6 +378,34 @@ class Keycode:
 
     def __repr__(self):
         return "{}".format(self.keystr)
+
+class MacroType:
+    KEYDOWN = 0x01
+    KEYUP = 0x02
+
+    def __init__(self, type_):
+        self.type = type_
+        self.typestr = UNKNOWN_MACROTYPE_STR
+        for attribute in MacroType.__dict__.keys():
+            if attribute[:2] != '__':
+                value = getattr(MacroType, attribute)
+                if not callable(value):
+                    if self.type == value:
+                        self.typestr = attribute
+        if self.typestr is UNKNOWN_MACROTYPE_STR:
+            self.typestr = f"UNKNOWN_{self.type:02X}"
+
+    @classmethod
+    def fromstr(cls, typestr):
+        for attribute in MacroType.__dict__.keys():
+            if attribute[:2] != '__':
+                value = getattr(MacroType, attribute)
+                if not callable(value):
+                    if typestr == attribute:
+                        return cls(value)
+
+    def __repr__(self):
+        return self.typestr
 
 class Job(threading.Thread):
     def __init__(self, **kwargs):
@@ -404,6 +439,7 @@ class DuMangKeyModule:
     def __init__(self, key, layer_keycodes=None):
         self.key = key
         self.layer_keycodes = layer_keycodes
+        self.macro = []
 
     def __lt__(self, other):
         return self.key < other.key
@@ -497,21 +533,29 @@ class DuMangBoard:
     @property
     def configured_keys(self):
         if not self._keys_initialized:
+            pending = 0
             for k in range(MAX_KEYS):
                 self.put(KeyReportRequestPacket(k))
+                pending += 1
 
-            while True:
-                # NOTE: Wait for all requests to be sent out and the recv queue to be populated.
-                if self.send_q.empty():
-                    while not self.recv_q.empty():
-                        p = self.recv_q.get()
-                        if isinstance(p, KeyReportResponsePacket):
-                            if any([kc.keycode != 0 for kc in p.layer_keycodes.values()]):
-                                # NOTE: We add the layer_keycodes to the DKM
-                                p.key.layer_keycodes = p.layer_keycodes
-                                self._configured_keys[p.key.key] = DuMangKeyModule(p.key, p.layer_keycodes)
-                    self._keys_initialized = True
-                    break
+            while pending > 0:
+                p = self.recv_q.get()
+                if isinstance(p, KeyReportResponsePacket):
+                    pending -= 1
+                    if any([kc.keycode != 0 for kc in p.layer_keycodes.values()]):
+                        # NOTE: We add the layer_keycodes to the DKM
+                        p.key.layer_keycodes = p.layer_keycodes
+                        self._configured_keys[p.key.key] = DuMangKeyModule(p.key, p.layer_keycodes)
+                    if any([kc.keycode == Keycode.MACRO for kc in p.layer_keycodes.values()]):
+                        self.put(MacroReportRequestPacket(p.key, 0))
+                        pending += 1
+                if isinstance(p, MacroReportResponsePacket):
+                    pending -= 1
+                    if p.type.type not in [0, 0xff]:
+                        self._configured_keys[p.key.key].macro.append(p)
+                        self.put(MacroReportRequestPacket(p.key, p.idx + 1))
+                        pending += 1
+            self._keys_initialized = True
 
         return self._configured_keys
 
@@ -538,6 +582,8 @@ class DuMangPacket:
                 c = LightPulsePacket.fromrawbytes(rawbytes)
             elif (cmd == KEY_REPORT_RESPONSE_CMD):
                 c = KeyReportResponsePacket.fromrawbytes(rawbytes)
+            elif (cmd == MACRO_REPORT_RESPONSE_CMD):
+                c = MacroReportResponsePacket.fromrawbytes(rawbytes)
             else:
                 c = cls(cmd, rawbytes[1:])
 
@@ -640,6 +686,31 @@ class KeyConfigurePacket(DuMangPacket):
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
+
+class MacroReportRequestPacket(DuMangPacket):
+    def __init__(self, key, idx):
+        super().__init__(MACRO_REPORT_REQUEST_CMD, None)
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
+        self.idx = idx
+
+    def encode(self):
+        return [self.cmd, self.key.encode(), self.idx + MACRO_MIN_IDX, 0x00, 0x00]
+
+class MacroReportResponsePacket(DuMangPacket):
+    def __init__(self, key, idx, type_, keycode, delay):
+        super().__init__(MACRO_REPORT_RESPONSE_CMD, None)
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
+        self.idx = idx
+        self.type = type_
+        self.keycode = keycode
+        self.delay = delay
+
+    @classmethod
+    def fromrawbytes(cls, rawbytes):
+        return cls(rawbytes[1], rawbytes[2] - MACRO_MIN_IDX, MacroType(rawbytes[3]), Keycode(rawbytes[4]), rawbytes[5] * 256 + rawbytes[6])
+
+    def __repr__(self):
+        return "{} - CMD:{:02X} Key:{} Idx:{} Type:{} Keycode:{} Delay:{}".format(self.__class__.__name__, self.cmd, self.key, self.idx, self.type, self.keycode, self.delay)
 
 def signal_handler(signal, frame):
     sys.exit(0)

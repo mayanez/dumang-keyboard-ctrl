@@ -79,8 +79,15 @@ def main():
         for i, kbd in enumerate(kbds):
             cfg_yml['kbd_{}'.format(i)]['serial'] = kbd.serial
             for _, dkm in kbd.configured_keys.items():
+                cfg_key = cfg_yml['kbd_{}'.format(i)]['keys']['key_{}'.format(dkm.key)]
                 for l, kc in dkm.layer_keycodes.items():
-                    cfg_yml['kbd_{}'.format(i)]['keys']['key_{}'.format(dkm.key)]['layer_{}'.format(l)] = str(kc)
+                    cfg_key['layer_{}'.format(l)] = str(kc)
+                if dkm.macro:
+                    cfg_key['macro'] = [{
+                        "type": str(m.type),
+                        "key": str(m.keycode),
+                        "delay_ms": m.delay,
+                    } for m in dkm.macro]
             kbd.kill_threads()
         yaml.dump(cfg_yml, sys.stdout, allow_unicode=True, default_flow_style=False, sort_keys=False)
     elif arguments['config']:
