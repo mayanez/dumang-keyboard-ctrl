@@ -492,6 +492,8 @@ class DuMangBoard:
             self.handle.read(64, timeout_ms=DuMangBoard.READ_TIMEOUT_MS)
         except OSError:
             valid = False
+        except ValueError:
+            valid = False
 
         if valid:
             self.handle.close()
