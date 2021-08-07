@@ -11,7 +11,46 @@ kb2:
   serial: 05D5FF313737584D43237109 # Replace with your keyboard serial
   keys:
     key_00:
-      layer_0: END
+      # Note: MACRO can be used for only a single layer for a key.
+      # The official setup tool seems to have the same restriction.
+      layer_0: MACRO
       layer_1: EIGHT
       layer_2: NINE
       layer_3: ZERO
+      macro:
+      - type: KEYDOWN
+        key: SHIFT
+        delay_ms: 10
+      - type: KEYDOWN
+        key: H
+        delay_ms: 10
+      - type: KEYUP
+        key: H
+        delay_ms: 10
+      - type: KEYUP
+        key: SHIFT
+        delay_ms: 10
+      - type: KEYDOWN
+        key: E
+        delay_ms: 10
+      - type: KEYUP
+        key: E
+        delay_ms: 10
+      - type: KEYDOWN
+        key: L
+        delay_ms: 10
+      - type: KEYUP
+        key: L
+        delay_ms: 10
+      - type: KEYDOWN
+        key: L
+        delay_ms: 10
+      - type: KEYUP
+        key: L
+        delay_ms: 10
+      - type: KEYDOWN
+        key: O
+        delay_ms: 10
+      - type: KEYUP
+        key: O
+        delay_ms: 10
