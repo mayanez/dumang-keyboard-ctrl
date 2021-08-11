@@ -90,6 +90,8 @@ def main():
             cfg_yml['kbd_{}'.format(i)]['serial'] = kbd.serial
             for _, dkm in kbd.configured_keys.items():
                 cfg_key = cfg_yml['kbd_{}'.format(i)]['keys']['key_{}'.format(dkm.key)]
+                if dkm.serial is not None:
+                    cfg_key['serial'] = dkm.serial
                 for l, kc in dkm.layer_keycodes.items():
                     cfg_key['layer_{}'.format(l)] = str(kc)
                 if dkm.macro:
