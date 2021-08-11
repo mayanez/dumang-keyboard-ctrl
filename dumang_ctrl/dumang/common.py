@@ -315,7 +315,7 @@ class Keycode:
     """Change while pressing to keyboard Layer 1""" 
     LAYER_TOGGLE_2 = 0xD6
     """Change while pressing to keyboard Layer 2""" 
-    LAYER_TOGGLE_3 = 0xD6
+    LAYER_TOGGLE_3 = 0xD7
     """Change while pressing to keyboard Layer 3"""
 
     LAYER_KEY_0 = 0xDC
