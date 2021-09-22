@@ -43,13 +43,23 @@ def init_receive_threads(kbds):
 
 def configure_keys(cfg, b):
     for k in cfg:
-        key = int(k.split('_')[1])
+        key = int(k.split('_')[1], 16)
         layer_keycodes = {}
         for l in cfg[k]:
+            if not l.startswith("layer_"):
+                continue
             layer = int(l.split('_')[1])
             layer_keycodes[layer] = Keycode.fromstr(cfg[k][l])
 
         b.put(KeyConfigurePacket(key, layer_keycodes))
+
+        macro = cfg[k].get("macro")
+        if macro:
+            idx = 0
+            for m in macro:
+                b.put(MacroConfigurePacket(key, idx, MacroType.fromstr(m["type"]), Keycode.fromstr(m["key"]), int(m["delay_ms"])))
+                idx += 1
+            b.put(MacroConfigurePacket(key, idx, MacroType(0), Keycode(0), 0))
 
 def configure_board(cfg, b):
     for kbd in cfg:
@@ -79,17 +89,24 @@ def main():
         for i, kbd in enumerate(kbds):
             cfg_yml['kbd_{}'.format(i)]['serial'] = kbd.serial
             for _, dkm in kbd.configured_keys.items():
+                cfg_key = cfg_yml['kbd_{}'.format(i)]['keys']['key_{}'.format(dkm.key)]
                 for l, kc in dkm.layer_keycodes.items():
-                    cfg_yml['kbd_{}'.format(i)]['keys']['key_{}'.format(dkm.key)]['layer_{}'.format(l)] = str(kc)
+                    cfg_key['layer_{}'.format(l)] = str(kc)
+                if dkm.macro:
+                    cfg_key['macro'] = [{
+                        "type": str(m.type),
+                        "key": str(m.keycode),
+                        "delay_ms": m.delay,
+                    } for m in dkm.macro]
+            kbd.kill_threads()
         yaml.dump(cfg_yml, sys.stdout, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        sys.exit(0)
     elif arguments['config']:
         ymlfile = open(arguments['<file>'], 'r')
-        cfg = yaml.load(ymlfile)
+        cfg = yaml.safe_load(ymlfile)
         for kbd in kbds:
             configure_board(cfg, kbd)
+            kbd.kill_threads()
         logging.info('Configured.')
-        sys.exit(0)
     elif arguments['gui']:
         logging.info('Launching GUI')
         inspect_gui(*kbds)
