@@ -437,9 +437,10 @@ class JobKiller:
 
 # TODO: Implement remaining packet types.
 class DuMangKeyModule:
-    def __init__(self, key, layer_keycodes=None):
+    def __init__(self, key, layer_keycodes=None, serial=None):
         self.key = key
         self.layer_keycodes = layer_keycodes
+        self.serial = serial
         self.macro = []
 
     def __lt__(self, other):
@@ -548,7 +549,7 @@ class DuMangBoard:
                     if any([kc.keycode != 0 for kc in p.layer_keycodes.values()]):
                         # NOTE: We add the layer_keycodes to the DKM
                         p.key.layer_keycodes = p.layer_keycodes
-                        self._configured_keys[p.key.key] = DuMangKeyModule(p.key, p.layer_keycodes)
+                        self._configured_keys[p.key.key] = DuMangKeyModule(p.key, p.layer_keycodes, p.serial)
                     if any([kc.keycode == Keycode.MACRO for kc in p.layer_keycodes.values()]):
                         self.put(MacroReportRequestPacket(p.key, 0))
                         pending += 1
@@ -666,17 +667,22 @@ class KeyReportRequestPacket(DuMangPacket):
         return [self.cmd, self.key.encode(), 0x00, 0x00, 0x00]
 
 class KeyReportResponsePacket(DuMangPacket):
-    def __init__(self, key, layer_keycodes):
+    def __init__(self, key, layer_keycodes, serial):
         super().__init__(KEY_REPORT_RESPONSE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
         self.layer_keycodes = layer_keycodes
+        self.serial = serial
 
     @classmethod
     def fromrawbytes(cls, rawbytes):
-        return cls(rawbytes[1], {0: Keycode(rawbytes[7]), 1: Keycode(rawbytes[8]), 2: Keycode(rawbytes[9]), 3: Keycode(rawbytes[10])})
+        serial = (rawbytes[2] << 24) + (rawbytes[3] << 16) + \
+                 (rawbytes[4] << 8) + rawbytes[5]
+        return cls(rawbytes[1],
+                   {0: Keycode(rawbytes[7]), 1: Keycode(rawbytes[8]), 2: Keycode(rawbytes[9]), 3: Keycode(rawbytes[10])},
+                   f"{serial:08X}")
 
     def __repr__(self):
-        return "{} - CMD:{:02X} Key:{} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
+        return "{} - CMD:{:02X} Key:{} Serial:{} LayerKeycodes:{}".format(self.__class__.__name__, self.cmd, self.key, self.serial, self.layer_keycodes)
 
 class KeyConfigurePacket(DuMangPacket):
     def __init__(self, key, layer_keycodes):
