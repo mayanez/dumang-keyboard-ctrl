@@ -72,6 +72,7 @@ def configure_key(b, key, cfg):
         b.put(MacroConfigurePacket(key, idx, MacroType(0), Keycode(0), 0))
 
 def configure_keys(kbd_serial, cfg, kbds, use_dkm_serial):
+    n = 0
     if not use_dkm_serial:
         b = find_kbd_by_serial(kbds, kbd_serial)
         if b is None:
@@ -120,10 +121,14 @@ def configure_keys(kbd_serial, cfg, kbds, use_dkm_serial):
                     logger.error(f'DKM with serial {key_serial} changed its index from {key_idx} to {key_by_serial_int}')
                     sys.exit(1)
         configure_key(b, key, cfg[k])
+        n += 1
+    return n
 
 def configure_boards(cfg, kbds, use_dkm_serial):
+    n = 0
     for kbd in cfg:
-        configure_keys(cfg[kbd]['serial'], cfg[kbd]['keys'], kbds, use_dkm_serial)
+        n += configure_keys(cfg[kbd]['serial'], cfg[kbd]['keys'], kbds, use_dkm_serial)
+    return n
 
 def main():
     arguments = docopt(__doc__, version='Dumang DK6 Config Tool 1.0')
@@ -165,10 +170,10 @@ def main():
         use_dkm_serial = not arguments['--use-dkm-index']
         ymlfile = open(arguments['<file>'], 'r')
         cfg = yaml.safe_load(ymlfile)
-        configure_boards(cfg, kbds, use_dkm_serial)
+        n = configure_boards(cfg, kbds, use_dkm_serial)
         for kbd in kbds:
             kbd.kill_threads()
-        logger.info('Configured.')
+        logger.info(f'Configured {n} keys.')
     elif arguments['gui']:
         logger.info('Launching GUI')
         inspect_gui(*kbds)
