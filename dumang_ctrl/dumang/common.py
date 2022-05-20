@@ -9,7 +9,7 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler())
 
 INIT_CMD = 0x30
