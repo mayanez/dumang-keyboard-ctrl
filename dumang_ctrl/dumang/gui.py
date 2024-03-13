@@ -10,7 +10,7 @@ from .common import *
 class KBDTableView(QTableWidget):
     itemLeave = pyqtSignal()
 
-    HEADERS = ['Keycode', 'Layer 0', 'Layer 1', 'Layer 2', 'Layer 3']
+    HEADERS = ['Key Module Serial', 'Layer 0', 'Layer 1', 'Layer 2', 'Layer 3']
 
     def __init__(self, keys, *args):
         super().__init__(len(keys), len(KBDTableView.HEADERS), *args)
@@ -22,21 +22,22 @@ class KBDTableView(QTableWidget):
         self.viewport().installEventFilter(self)
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().setStretchLastSection(True)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.setSelectionBehavior(QTableView.SelectRows)
+        self.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Fixed)
+        self.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
 
     def setData(self):
         for n, p in enumerate(self.keys.items()):
-            kc, k = p
+            serial, dkm = p
 
-            for m, layer in enumerate(k.layer_keycodes.values()):
-                newitem = QTableWidgetItem(str(layer))
-                newitem.setFlags(Qt.ItemIsEnabled)
+            for m, layer in enumerate(dkm.layer_keycodes.values()):
+                # NOTE: Use repr() here to show the Aliases
+                # for keycodes should they exist.
+                newitem = QTableWidgetItem(repr(layer))
                 newitem.setFlags(Qt.ItemFlag.ItemIsEnabled)
                 self.setItem(n, m + 1, newitem)
 
-            keycodeitem = QTableWidgetItem(str(hex(kc)))
-            keycodeitem.setFlags(Qt.ItemIsEnabled)
+            keycodeitem = QTableWidgetItem(dkm.serial)
             keycodeitem.setFlags(Qt.ItemFlag.ItemIsEnabled)
             self.setItem(n, 0, keycodeitem)
 
@@ -57,22 +58,20 @@ class KBDTableView(QTableWidget):
         # proved problematic when scrolling as it would trigger Enter events, but no Leave events.
         if item != self._last_item and self._last_item is not None:
             p = LightPulsePacket(
-                False,
-                self.keys[int(self.item(self._last_item.row(), 0).data(0),
-                              16)].key)
+                False, self.keys[self.item(self._last_item.row(),
+                                           0).data(0)].key)
             kbd.put(p)
 
-        p = LightPulsePacket(
-            True, self.keys[int(self.item(item.row(), 0).data(0), 16)].key)
+        p = LightPulsePacket(True, self.keys[self.item(item.row(),
+                                                       0).data(0)].key)
         kbd.put(p)
         self._last_item = item
 
     def _on_itemLeave(self, kbd):
         p = LightPulsePacket(
-            False,
-            self.keys[int(self.item(self._last_item.row(), 0).data(0),
-                          16)].key)
+            False, self.keys[self.item(self._last_item.row(), 0).data(0)].key)
         kbd.put(p)
+        pass
 
 
 class KBDWidget(QWidget):
@@ -106,8 +105,10 @@ class KBDTab(QWidget):
         self.layout = QVBoxLayout(self)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        self.kbd_label = QLabel("KBD: " + kbd.serial)
+        self.kbd_label = QLabel(f"Board Serial: {kbd.serial}")
         self.layout.addWidget(self.kbd_label)
+
+        # TODO: Refresh Button
 
         # Add dropdown/combo box
         headers = [f'Layer {i}' for i in range(MAX_LAYERS)]
@@ -160,7 +161,7 @@ class App(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.title = 'Dumang Board Progamming Tool'
+        self.title = 'Dumang Board Configuration Inspection Tool'
         self.left = 0
         self.top = 0
         self.width = 500

@@ -30,13 +30,18 @@ PRODUCT_ID = 0x5710
 KBD_1_ID = 0x25
 KBD_2_ID = 0x0D
 
-MAX_KEYS = 256
+# NOTE: Technically the maximum is 256, but we cap it to reduce "request" times
+MAX_KEYS = 50
 MAX_LAYERS = 4
-UNKNOWN_KEYCODE_STR = "UNKNOWN"
 UNKNOWN_MACROTYPE_STR = "UNKNOWN"
+
+NOTIFY_STATUS_READY = "ready"
+NOTIFY_STATUS_WAIT = "wait"
+NOTIFY_STATUS_STOP = "stop"
 
 
 class Keycode:
+    """These are HID Keycodes and can be found here: https://usb.org/sites/default/files/hut1_3_0.pdf"""
     MACRO = 0x03
     """Macro"""
 
@@ -333,16 +338,16 @@ class Keycode:
 
     def __init__(self, keycode):
         self.keycode = keycode
-        self.keystr = UNKNOWN_KEYCODE_STR
+        self.keystr = []
 
         for attribute in Keycode.__dict__.keys():
             if attribute[:2] != '__':
                 value = getattr(Keycode, attribute)
                 if not callable(value):
                     if self.keycode == value:
-                        self.keystr = attribute
-        if self.keystr is UNKNOWN_KEYCODE_STR:
-            self.keystr = f"UNKNOWN_{self.keycode:02X}"
+                        self.keystr.append(attribute)
+        if not self.keystr:
+            self.keystr = [f"UNKNOWN_{self.keycode:02X}"]
 
     def __lt__(self, other):
         return self.keycode < other.keycode
@@ -375,8 +380,15 @@ class Keycode:
     def encode(self):
         return self.keycode
 
+    def __str__(self):
+        # NOTE: The first item in the list
+        # will be used. This is determined by the definition
+        # order in this class.
+        return self.keystr[0]
+
     def __repr__(self):
-        return "{}".format(self.keystr)
+        return "/".join(self.keystr)
+
 
 
 class MacroType:
@@ -433,6 +445,9 @@ class Job(threading.Thread):
             super().start()
         else:
             logger.debug('Thread previously started')
+
+    def stop(self):
+        self.shutdown_flag.set()
 
 
 class JobKiller:
@@ -559,7 +574,7 @@ class DuMangBoard:
                         [kc.keycode != 0 for kc in p.layer_keycodes.values()]):
                         # NOTE: We add the layer_keycodes to the DKM
                         p.key.layer_keycodes = p.layer_keycodes
-                        self._configured_keys[p.key.key] = DuMangKeyModule(
+                        self._configured_keys[p.serial] = DuMangKeyModule(
                             p.key, p.layer_keycodes, p.serial)
                     if any([
                             kc.keycode == Keycode.MACRO
@@ -570,7 +585,7 @@ class DuMangBoard:
                 if isinstance(p, MacroReportResponsePacket):
                     pending -= 1
                     if p.type.type not in [0, 0xff]:
-                        self._configured_keys[p.key.key].macro.append(p)
+                        self._configured_keys[p.serial].macro.append(p)
                         self.put(MacroReportRequestPacket(p.key, p.idx + 1))
                         pending += 1
             self._keys_initialized = True
@@ -892,14 +907,14 @@ class USBConnectionMonitor:
         self._has_started = False
 
     def _on_device_left(self, detected_device):
-        print('Device left:', str(detected_device))
+        logger.debug(f'Device left: {str(detected_device)}')
 
     def _on_device_arrived(self, detected_device):
         detected_device.onClose = self._on_device_left
-        print('Device arrived:', str(detected_device))
+        logger.debug(f'Device arrived: {str(detected_device)}')
 
     def _register_callback(self):
-        self.context.hotplugRegisterCallback(
+        self._callback_handle = self.context.hotplugRegisterCallback(
             self._on_hotplug_event,
             # Just in case more events are added in the future.
             events=usb1.HOTPLUG_EVENT_DEVICE_ARRIVED
@@ -911,6 +926,9 @@ class USBConnectionMonitor:
             product_id=self.product_id,
             #dev_class=,
         )
+
+    def _deregister_callback(self):
+        self.context.hotplugDeregisterCallback(self._callback_handle)
 
     def _on_hotplug_event(self, context, device, event):
         if event == usb1.HOTPLUG_EVENT_DEVICE_LEFT:
@@ -943,13 +961,17 @@ class USBConnectionMonitor:
                 'Too many boards connected. Not sure how to handle it.')
 
     def ready(self):
-        self.notify_q.put('ready')
+        self.notify_q.put(NOTIFY_STATUS_READY)
 
     def wait(self):
-        self.notify_q.put('wait')
+        self.notify_q.put(NOTIFY_STATUS_WAIT)
 
     def get_status(self):
         return self.notify_q.get()
+
+    def stop(self):
+        self._deregister_callback()
+        self.notify_q.put(NOTIFY_STATUS_STOP)
 
     def join(self):
         pass
@@ -964,12 +986,14 @@ class USBConnectionMonitorRunner(USBConnectionMonitor):
     def __init__(self, vendor_id, product_id):
         super().__init__(vendor_id, product_id)
         self._observer = threading.Thread(target=self._run, daemon=True)
+        self._shutdown_flag = threading.Event()
 
     def _run(self):
         with self.context:
-            print('Registering hotplug callback...')
+            logger.debug('Registering hotplug callback...')
             self._register_callback()
-            while True:
+            while not self._shutdown_flag.is_set():
+                # NOTE: This call will block until callback is deregistered.
                 self.context.handleEvents()
 
     def start(self):
@@ -978,3 +1002,9 @@ class USBConnectionMonitorRunner(USBConnectionMonitor):
     def join(self):
         if self._observer:
             self._observer.join()
+
+    def stop(self):
+        if self._observer:
+            # NOTE: Set shutdown_flag before stopping.
+            self._shutdown_flag.set()
+            super().stop()

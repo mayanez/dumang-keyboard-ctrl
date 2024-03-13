@@ -1,56 +1,59 @@
 # This is just a sample config
-kb1:
-  serial: 05DAFF313737584D43237533 # Replace with your keyboard serial
-  keys:
-    key_00:
-      layer_0: SEVEN
-      layer_1: EIGHT
-      layer_2: NINE
-      layer_3: ZERO
-kb2:
-  serial: 05D5FF313737584D43237109 # Replace with your keyboard serial
-  keys:
-    key_00:
-      # Note: MACRO can be used for only a single layer for a key.
-      # The official setup tool seems to have the same restriction.
-      layer_0: MACRO
-      layer_1: EIGHT
-      layer_2: NINE
-      layer_3: ZERO
-      macro:
-      - type: KEYDOWN
-        key: SHIFT
-        delay_ms: 10
-      - type: KEYDOWN
-        key: H
-        delay_ms: 10
-      - type: KEYUP
-        key: H
-        delay_ms: 10
-      - type: KEYUP
-        key: SHIFT
-        delay_ms: 10
-      - type: KEYDOWN
-        key: E
-        delay_ms: 10
-      - type: KEYUP
-        key: E
-        delay_ms: 10
-      - type: KEYDOWN
-        key: L
-        delay_ms: 10
-      - type: KEYUP
-        key: L
-        delay_ms: 10
-      - type: KEYDOWN
-        key: L
-        delay_ms: 10
-      - type: KEYUP
-        key: L
-        delay_ms: 10
-      - type: KEYDOWN
-        key: O
-        delay_ms: 10
-      - type: KEYUP
-        key: O
-        delay_ms: 10
+- board:
+    serial: 05DAFF313737584D43237533 # Replace with your Board serial
+    keys:
+      - key:
+          serial: 12345 # Replace with your Key Module Serial
+          layer_0: SEVEN
+          layer_1: EIGHT
+          layer_2: NINE
+          layer_3: ZERO
+
+- board:
+    serial: 05D5FF313737584D43237109 # Replace with your Board serial
+    keys:
+      - key:
+          # Note: MACRO can be used for only a single layer for a key.
+          # The official setup tool seems to have the same restriction.
+          serial: 12345 # Replace with your Key Module Serial
+          layer_0: MACRO
+          layer_1: EIGHT
+          layer_2: NINE
+          layer_3: ZERO
+          macro:
+            - type: KEYDOWN
+              key: SHIFT
+              delay_ms: 10
+            - type: KEYDOWN
+              key: H
+              delay_ms: 10
+            - type: KEYUP
+              key: H
+              delay_ms: 10
+            - type: KEYUP
+              key: SHIFT
+              delay_ms: 10
+            - type: KEYDOWN
+              key: E
+              delay_ms: 10
+            - type: KEYUP
+              key: E
+              delay_ms: 10
+            - type: KEYDOWN
+              key: L
+              delay_ms: 10
+            - type: KEYUP
+              key: L
+              delay_ms: 10
+            - type: KEYDOWN
+              key: L
+              delay_ms: 10
+            - type: KEYUP
+              key: L
+              delay_ms: 10
+            - type: KEYDOWN
+              key: O
+              delay_ms: 10
+            - type: KEYUP
+              key: O
+              delay_ms: 10

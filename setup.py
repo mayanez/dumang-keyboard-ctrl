@@ -26,11 +26,11 @@ setuptools.setup(
     ],
     packages=setuptools.find_packages(),
     include_package_data=True,
-    install_requires=["docopt", "hidapi", "PyQt6", "PyYAML", "libusb1"],
+    install_requires=["docopt", "hidapi", "PyQt6", "PyYAML", "libusb1", "click"],
     entry_points={
         "console_scripts": [
-            "dumang-sync = dumang_ctrl.tools.sync:main",
-            "dumang-config = dumang_ctrl.tools.config:main"
+            "dumang-sync = dumang_ctrl.tools.sync:cli",
+            "dumang-config = dumang_ctrl.tools.config:cli"
         ]
     },
 )
