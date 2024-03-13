@@ -1,5 +1,6 @@
 import pathlib
 import setuptools
+import dumang_ctrl
 
 # The directory containing this file
 HERE = pathlib.Path(__file__).parent
@@ -9,12 +10,12 @@ README = (HERE / "README.md").read_text()
 
 # This call to setup() does all the work
 setuptools.setup(
-    name="dumang_ctrl",
-    version="0.0.3",
-    description="Dumang DK6 Tools",
+    name=dumang_ctrl.name,
+    version=dumang_ctrl.version,
+    description=dumang_ctrl.description,
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/mayanez/",
+    url=dumang_ctrl.url,
     author="Miguel A. Arroyo",
     author_email="dumang@arroyo.me",
     license="GPLv3",

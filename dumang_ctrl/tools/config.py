@@ -19,14 +19,14 @@ import yaml
 from docopt import docopt
 from collections import OrderedDict
 
+import dumang_ctrl as pkginfo
 from dumang_ctrl.dumang.common import *
 # TODO: Import only if using gui.
 from dumang_ctrl.dumang.gui import *
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("DuMang Config")
+logger.setLevel(logging.INFO)
 
-logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler())
 
 
 class NestedDict(OrderedDict):

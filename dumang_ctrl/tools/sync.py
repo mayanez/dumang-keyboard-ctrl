@@ -1,11 +1,9 @@
 import logging
+import dumang_ctrl as pkginfo
 from dumang_ctrl.dumang.common import *
 
-logger = logging.getLogger(__name__)
-
-# NOTE: Enable for debugging
-logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler())
+logger = logging.getLogger("DuMang Sync")
+logger.setLevel(logging.INFO)
 
 
 def layer_toggle_process(p):

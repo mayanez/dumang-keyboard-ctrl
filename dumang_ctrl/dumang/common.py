@@ -9,9 +9,6 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-# logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler())
-
 INIT_CMD = 0x30
 SYNC_CMD = 0x46
 INFO_CMD = 0x18
