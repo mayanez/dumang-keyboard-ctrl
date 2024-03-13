@@ -1,8 +1,8 @@
 import sys
 
-from PyQt5 import uic, QtGui
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt6 import uic, QtGui
+from PyQt6.QtWidgets import *
+from PyQt6.QtCore import *
 from collections import defaultdict
 from .common import *
 
@@ -32,17 +32,19 @@ class KBDTableView(QTableWidget):
             for m, layer in enumerate(k.layer_keycodes.values()):
                 newitem = QTableWidgetItem(str(layer))
                 newitem.setFlags(Qt.ItemIsEnabled)
+                newitem.setFlags(Qt.ItemFlag.ItemIsEnabled)
                 self.setItem(n, m + 1, newitem)
 
             keycodeitem = QTableWidgetItem(str(hex(kc)))
             keycodeitem.setFlags(Qt.ItemIsEnabled)
+            keycodeitem.setFlags(Qt.ItemFlag.ItemIsEnabled)
             self.setItem(n, 0, keycodeitem)
 
         self.setHorizontalHeaderLabels(KBDTableView.HEADERS)
 
     def eventFilter(self, widget, event):
         if widget is self.viewport():
-            if event.type() == QEvent.Leave:
+            if event.type() == QEvent.Type.Leave:
                 index = QModelIndex()
                 self.itemLeave.emit()
                 return True
@@ -102,7 +104,7 @@ class KBDTab(QWidget):
     def __init__(self, parent, kbd):
         super(QWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
-        self.layout.setAlignment(Qt.AlignTop)
+        self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.kbd_label = QLabel("KBD: " + kbd.serial)
         self.layout.addWidget(self.kbd_label)
@@ -168,9 +170,9 @@ class App(QMainWindow):
         self.center()
 
     def center(self):
-        screen = QApplication.desktop().screenNumber(
-            QApplication.desktop().cursor().pos())
-        centerPoint = QApplication.desktop().screenGeometry(screen).center()
+        pass
+        centerPoint = QtGui.QGuiApplication.primaryScreen().availableGeometry(
+        ).center()
         self.move(centerPoint - self.frameGeometry().center())
 
 
@@ -180,4 +182,4 @@ def inspect_gui(kbd1, kbd2=None):
     kbds = [kbd for kbd in [kbd1, kbd2] if kbd is not None]
     app.setCentralWidget(KBDTabs(app, kbds))
     app.show()
-    sys.exit(init.exec_())
+    sys.exit(init.exec())
