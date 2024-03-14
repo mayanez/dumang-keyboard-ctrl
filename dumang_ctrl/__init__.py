@@ -1,9 +1,10 @@
-name = "dumang_ctrl"
-version_info = (1, 0, 0)
-version = '.'.join(str(c) for c in version_info)
-description = "Dumang DK6 Tools"
-url = "https://github.com/mayanez/dumang-keyboard-ctrl"
-
+import importlib.metadata
 import logging
 import sys
+
+pkgmetadata = importlib.metadata.metadata(__package__)
+version = pkgmetadata['Version']
+description = pkgmetadata['Summary']
+url = pkgmetadata['Home-page']
+
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)

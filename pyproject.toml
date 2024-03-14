@@ -1,0 +1,93 @@
+[tool.poetry]
+name = "dumang_ctrl"
+version = "1.0.0"
+description = "Dumang DK6 Tools"
+authors = ["Miguel A. Arroyo <email@arroyo.me>"]
+repository = "https://github.com/mayanez/dumang-keyboard-ctrl"
+documentation = "https://mayanez.github.io/dumang-keyboard-ctrl/"
+readme = "README.md"
+license = "LICENSE"
+packages = [
+  {include = "dumang_ctrl"}
+]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+hidapi = "*"
+PyQt6  = "*"
+PyYAML = "*"
+libusb1 = "*"
+click  = "*"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.5.1"
+pre-commit = "^3.4.0"
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = "^1.4.2"
+mkdocs-material = "^9.2.7"
+mkdocstrings = {extras = ["python"], version = "^0.23.0"}
+
+[tool.poetry.scripts]
+dumang-sync = 'dumang_ctrl.tools.sync:cli'
+dumang-config = 'dumang_ctrl.tools.config:cli'
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+files = ["dumang_ctrl"]
+disallow_untyped_defs = "True"
+disallow_any_unimported = "True"
+no_implicit_optional = "True"
+check_untyped_defs = "True"
+warn_return_any = "True"
+warn_unused_ignores = "True"
+show_error_codes = "True"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+fix = true
+select = [
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-builtins
+    "A",
+    # flake8-comprehensions
+    "C4",
+    # flake8-debugger
+    "T10",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # mccabe
+    "C90",
+    # pycodestyle
+    "E", "W",
+    # pyflakes
+    "F",
+    # pygrep-hooks
+    "PGH",
+    # pyupgrade
+    "UP",
+    # ruff
+    "RUF",
+    # tryceratops
+    "TRY",
+]
+ignore = [
+    # LineTooLong
+    "E501",
+    # DoNotAssignLambda
+    "E731",
+]
+
+[tool.ruff.format]
+preview = true
