@@ -1,16 +1,16 @@
 import sys
 
-from PyQt6 import uic, QtGui
-from PyQt6.QtWidgets import *
+from PyQt6 import QtGui
 from PyQt6.QtCore import *
-from collections import defaultdict
+from PyQt6.QtWidgets import *
+
 from .common import *
 
 
 class KBDTableView(QTableWidget):
     itemLeave = pyqtSignal()
 
-    HEADERS = ['Key Module Serial', 'Layer 0', 'Layer 1', 'Layer 2', 'Layer 3']
+    HEADERS = ["Key Module Serial", "Layer 0", "Layer 1", "Layer 2", "Layer 3"]
 
     def __init__(self, keys, *args):
         super().__init__(len(keys), len(KBDTableView.HEADERS), *args)
@@ -22,8 +22,7 @@ class KBDTableView(QTableWidget):
         self.viewport().installEventFilter(self)
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().setStretchLastSection(True)
-        self.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Fixed)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
 
     def setData(self):
@@ -44,11 +43,10 @@ class KBDTableView(QTableWidget):
         self.setHorizontalHeaderLabels(KBDTableView.HEADERS)
 
     def eventFilter(self, widget, event):
-        if widget is self.viewport():
-            if event.type() == QEvent.Type.Leave:
-                index = QModelIndex()
-                self.itemLeave.emit()
-                return True
+        if widget is self.viewport() and event.type() == QEvent.Type.Leave:
+            QModelIndex()
+            self.itemLeave.emit()
+            return True
 
         return QTableWidget.eventFilter(self, widget, event)
 
@@ -57,25 +55,20 @@ class KBDTableView(QTableWidget):
         # Previous solution as descriped in https://stackoverflow.com/questions/20064975
         # proved problematic when scrolling as it would trigger Enter events, but no Leave events.
         if item != self._last_item and self._last_item is not None:
-            p = LightPulsePacket(
-                False, self.keys[self.item(self._last_item.row(),
-                                           0).data(0)].key)
+            p = LightPulsePacket(False, self.keys[self.item(self._last_item.row(), 0).data(0)].key)
             kbd.put(p)
 
-        p = LightPulsePacket(True, self.keys[self.item(item.row(),
-                                                       0).data(0)].key)
+        p = LightPulsePacket(True, self.keys[self.item(item.row(), 0).data(0)].key)
         kbd.put(p)
         self._last_item = item
 
     def _on_itemLeave(self, kbd):
-        p = LightPulsePacket(
-            False, self.keys[self.item(self._last_item.row(), 0).data(0)].key)
+        p = LightPulsePacket(False, self.keys[self.item(self._last_item.row(), 0).data(0)].key)
         kbd.put(p)
         pass
 
 
 class KBDWidget(QWidget):
-
     def __init__(self, parent, kbd):
         super(QWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -86,8 +79,7 @@ class KBDWidget(QWidget):
     def _add_table_widget(self, kbd):
         kbd_widget = KBDTableView(kbd.configured_keys)
         kbd_widget.setMouseTracking(True)
-        kbd_widget.itemEntered.connect(
-            lambda item: kbd_widget._on_itemEntered(kbd, item))
+        kbd_widget.itemEntered.connect(lambda item: kbd_widget._on_itemEntered(kbd, item))
         kbd_widget.itemLeave.connect(lambda: kbd_widget._on_itemLeave(kbd))
         return kbd_widget
 
@@ -99,7 +91,6 @@ class KBDWidget(QWidget):
 
 
 class KBDTab(QWidget):
-
     def __init__(self, parent, kbd):
         super(QWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -111,7 +102,7 @@ class KBDTab(QWidget):
         # TODO: Refresh Button
 
         # Add dropdown/combo box
-        headers = [f'Layer {i}' for i in range(MAX_LAYERS)]
+        headers = [f"Layer {i}" for i in range(MAX_LAYERS)]
         self.comboLayouts = QComboBox()
         self.comboLayouts.addItems(headers)
         self.label = QLabel("&L:")
@@ -132,7 +123,6 @@ class KBDTab(QWidget):
 
 
 class KBDTabs(QWidget):
-
     def __init__(self, parent, kbds):
         super(QWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -141,7 +131,7 @@ class KBDTabs(QWidget):
         self.tabs = QTabWidget()
         # Add tabs
         for i, kbd in enumerate(kbds):
-            self.tabs.addTab(KBDTab(self, kbd), f'Board {i}')
+            self.tabs.addTab(KBDTab(self, kbd), f"Board {i}")
         self.tabs.resize(300, 200)
 
         # Add tabs to widget
@@ -152,16 +142,13 @@ class KBDTabs(QWidget):
     def on_click(self):
         print("\n")
         for currentQTableWidgetItem in self.tableWidget.selectedItems():
-            print(currentQTableWidgetItem.row(),
-                  currentQTableWidgetItem.column(),
-                  currentQTableWidgetItem.text())
+            print(currentQTableWidgetItem.row(), currentQTableWidgetItem.column(), currentQTableWidgetItem.text())
 
 
 class App(QMainWindow):
-
     def __init__(self):
         super().__init__()
-        self.title = 'Dumang Board Configuration Inspection Tool'
+        self.title = "Dumang Board Configuration Inspection Tool"
         self.left = 0
         self.top = 0
         self.width = 500
@@ -172,8 +159,7 @@ class App(QMainWindow):
 
     def center(self):
         pass
-        centerPoint = QtGui.QGuiApplication.primaryScreen().availableGeometry(
-        ).center()
+        centerPoint = QtGui.QGuiApplication.primaryScreen().availableGeometry().center()
         self.move(centerPoint - self.frameGeometry().center())
 
 

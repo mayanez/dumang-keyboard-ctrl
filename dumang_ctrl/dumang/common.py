@@ -1,11 +1,10 @@
-import hid
-import sys
-import signal
-import queue
-import threading
 import logging
+import queue
+import sys
+import threading
+
+import hid
 import usb1
-import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +41,7 @@ NOTIFY_STATUS_STOP = "stop"
 
 class Keycode:
     """These are HID Keycodes and can be found here: https://usb.org/sites/default/files/hut1_3_0.pdf"""
+
     MACRO = 0x03
     """Macro"""
 
@@ -340,12 +340,11 @@ class Keycode:
         self.keycode = keycode
         self.keystr = []
 
-        for attribute in Keycode.__dict__.keys():
-            if attribute[:2] != '__':
+        for attribute in Keycode.__dict__:
+            if attribute[:2] != "__":
                 value = getattr(Keycode, attribute)
-                if not callable(value):
-                    if self.keycode == value:
-                        self.keystr.append(attribute)
+                if not callable(value) and self.keycode == value:
+                    self.keystr.append(attribute)
         if not self.keystr:
             self.keystr = [f"UNKNOWN_{self.keycode:02X}"]
 
@@ -360,18 +359,17 @@ class Keycode:
 
     @classmethod
     def fromstr(cls, keystr):
-        for attribute in Keycode.__dict__.keys():
-            if attribute[:2] != '__':
+        for attribute in Keycode.__dict__:
+            if attribute[:2] != "__":
                 value = getattr(Keycode, attribute)
-                if not callable(value):
-                    if keystr == attribute:
-                        return cls(value)
+                if not callable(value) and keystr == attribute:
+                    return cls(value)
 
     @classmethod
     def keys(cls):
         result = []
-        for attribute in Keycode.__dict__.keys():
-            if attribute[:2] != '__':
+        for attribute in Keycode.__dict__:
+            if attribute[:2] != "__":
                 value = getattr(Keycode, attribute)
                 if not callable(value):
                     result.append(attribute)
@@ -390,7 +388,6 @@ class Keycode:
         return "/".join(self.keystr)
 
 
-
 class MacroType:
     KEYDOWN = 0x01
     KEYUP = 0x02
@@ -398,67 +395,60 @@ class MacroType:
     def __init__(self, type_):
         self.type = type_
         self.typestr = UNKNOWN_MACROTYPE_STR
-        for attribute in MacroType.__dict__.keys():
-            if attribute[:2] != '__':
+        for attribute in MacroType.__dict__:
+            if attribute[:2] != "__":
                 value = getattr(MacroType, attribute)
-                if not callable(value):
-                    if self.type == value:
-                        self.typestr = attribute
+                if not callable(value) and self.type == value:
+                    self.typestr = attribute
         if self.typestr is UNKNOWN_MACROTYPE_STR:
             self.typestr = f"UNKNOWN_{self.type:02X}"
 
     @classmethod
     def fromstr(cls, typestr):
-        for attribute in MacroType.__dict__.keys():
-            if attribute[:2] != '__':
+        for attribute in MacroType.__dict__:
+            if attribute[:2] != "__":
                 value = getattr(MacroType, attribute)
-                if not callable(value):
-                    if typestr == attribute:
-                        return cls(value)
+                if not callable(value) and typestr == attribute:
+                    return cls(value)
 
     def __repr__(self):
         return self.typestr
 
 
 class Job(threading.Thread):
-
     def __init__(self, **kwargs):
         try:
-            args = kwargs['args']
+            args = kwargs["args"]
         except KeyError:
             args = []
 
-        super().__init__(target=kwargs['target'],
-                         args=args,
-                         daemon=kwargs['daemon'])
+        super().__init__(target=kwargs["target"], args=args, daemon=kwargs["daemon"])
         self.shutdown_flag = threading.Event()
         self.started = False
 
     def run(self):
         while not self.shutdown_flag.is_set():
             self._target(*self._args, **self._kwargs)
-        logger.debug('Thread Killed')
+        logger.debug("Thread Killed")
 
     def start(self):
         if not self.started:
             self.started = True
             super().start()
         else:
-            logger.debug('Thread previously started')
+            logger.debug("Thread previously started")
 
     def stop(self):
         self.shutdown_flag.set()
 
 
 class JobKiller:
-
     def __init__(self):
         self.init = True
 
 
 # TODO: Implement remaining packet types.
 class DuMangKeyModule:
-
     def __init__(self, key, layer_keycodes=None, serial=None):
         self.key = key
         self.layer_keycodes = layer_keycodes
@@ -478,8 +468,7 @@ class DuMangKeyModule:
         return self.key
 
     def __repr__(self):
-        return "{:02X}".format(self.key) if isinstance(
-            self.key, int) else "{}".format(self.key)
+        return f"{self.key:02X}" if isinstance(self.key, int) else f"{self.key}"
 
 
 class DuMangBoard:
@@ -570,21 +559,16 @@ class DuMangBoard:
                 p = self.recv_q.get()
                 if isinstance(p, KeyReportResponsePacket):
                     pending -= 1
-                    if any(
-                        [kc.keycode != 0 for kc in p.layer_keycodes.values()]):
+                    if any([kc.keycode != 0 for kc in p.layer_keycodes.values()]):
                         # NOTE: We add the layer_keycodes to the DKM
                         p.key.layer_keycodes = p.layer_keycodes
-                        self._configured_keys[p.serial] = DuMangKeyModule(
-                            p.key, p.layer_keycodes, p.serial)
-                    if any([
-                            kc.keycode == Keycode.MACRO
-                            for kc in p.layer_keycodes.values()
-                    ]):
+                        self._configured_keys[p.serial] = DuMangKeyModule(p.key, p.layer_keycodes, p.serial)
+                    if any([kc.keycode == Keycode.MACRO for kc in p.layer_keycodes.values()]):
                         self.put(MacroReportRequestPacket(p.key, 0))
                         pending += 1
                 if isinstance(p, MacroReportResponsePacket):
                     pending -= 1
-                    if p.type.type not in [0, 0xff]:
+                    if p.type.type not in [0, 0xFF]:
                         self._configured_keys[p.serial].macro.append(p)
                         self.put(MacroReportRequestPacket(p.key, p.idx + 1))
                         pending += 1
@@ -594,7 +578,6 @@ class DuMangBoard:
 
 
 class DuMangPacket:
-
     def __init__(self, cmd, rawbytes):
         self.cmd = cmd
         self.rawbytes = rawbytes
@@ -605,19 +588,19 @@ class DuMangPacket:
         if rawbytes:
             cmd = rawbytes[0]
 
-            if (cmd == LAYER_PRESS_CMD):
+            if cmd == LAYER_PRESS_CMD:
                 c = LayerPressPacket.fromrawbytes(rawbytes)
-            elif (cmd == LAYER_DEPRESS_CMD):
+            elif cmd == LAYER_DEPRESS_CMD:
                 c = LayerDepressPacket.fromrawbytes(rawbytes)
-            elif (cmd == INIT_CMD):
+            elif cmd == INIT_CMD:
                 c = InitializationPacket()
-            elif (cmd == SYNC_CMD):
+            elif cmd == SYNC_CMD:
                 c = SyncPacket()
-            elif (cmd == LIGHT_PULSE_CMD):
+            elif cmd == LIGHT_PULSE_CMD:
                 c = LightPulsePacket.fromrawbytes(rawbytes)
-            elif (cmd == KEY_REPORT_RESPONSE_CMD):
+            elif cmd == KEY_REPORT_RESPONSE_CMD:
                 c = KeyReportResponsePacket.fromrawbytes(rawbytes)
-            elif (cmd == MACRO_REPORT_RESPONSE_CMD):
+            elif cmd == MACRO_REPORT_RESPONSE_CMD:
                 c = MacroReportResponsePacket.fromrawbytes(rawbytes)
             else:
                 c = cls(cmd, rawbytes[1:])
@@ -629,12 +612,11 @@ class DuMangPacket:
 
     def __repr__(self):
         return "{} - CMD:{:02X} raw:[{}]".format(
-            self.__class__.__name__, self.cmd,
-            ', '.join(hex(x) for x in self.rawbytes))
+            self.__class__.__name__, self.cmd, ", ".join(hex(x) for x in self.rawbytes)
+        )
 
 
 class InitializationPacket(DuMangPacket):
-
     def __init__(self):
         super().__init__(INIT_CMD, None)
 
@@ -643,7 +625,6 @@ class InitializationPacket(DuMangPacket):
 
 
 class LayerPressPacket(DuMangPacket):
-
     def __init__(self, ID, flag, layer_info):
         super().__init__(LAYER_PRESS_CMD, None)
         self.ID = ID
@@ -656,12 +637,11 @@ class LayerPressPacket(DuMangPacket):
 
     def __repr__(self):
         return "{} - CMD:{:02X} ID:{:02X} Flag:{:02X} LayerInfo:{:02X}".format(
-            self.__class__.__name__, self.cmd, self.ID, self.flag,
-            self.layer_info)
+            self.__class__.__name__, self.cmd, self.ID, self.flag, self.layer_info
+        )
 
 
 class LayerDepressPacket(DuMangPacket):
-
     def __init__(self, ID, flag, layer_info):
         super().__init__(LAYER_DEPRESS_CMD, None)
         self.ID = ID
@@ -674,12 +654,11 @@ class LayerDepressPacket(DuMangPacket):
 
     def __repr__(self):
         return "{} - CMD:{:02X} ID:{:02X} Flag:{:02X} LayerInfo:{:02X}".format(
-            self.__class__.__name__, self.cmd, self.ID, self.flag,
-            self.layer_info)
+            self.__class__.__name__, self.cmd, self.ID, self.flag, self.layer_info
+        )
 
 
 class SyncPacket(DuMangPacket):
-
     def __init__(self, ID, press, layer_info):
         super().__init__(SYNC_CMD, None)
         self.ID = ID
@@ -687,14 +666,10 @@ class SyncPacket(DuMangPacket):
         self.layer_info = layer_info
 
     def encode(self):
-        return [
-            self.cmd, 0x01, self.press, 0x00, self.ID, self.layer_info,
-            self.layer_info & 0x03, 0x00
-        ]
+        return [self.cmd, 0x01, self.press, 0x00, self.ID, self.layer_info, self.layer_info & 0x03, 0x00]
 
 
 class LightPulsePacket(DuMangPacket):
-
     def __init__(self, onoff, key):
         super().__init__(LIGHT_PULSE_CMD, None)
         self.onoff = 0x03 if onoff else 0x02
@@ -702,14 +677,13 @@ class LightPulsePacket(DuMangPacket):
 
     @classmethod
     def fromrawbytes(cls, rawbytes):
-        return cls(True if rawbytes[2] == 0x03 else False, rawbytes[1])
+        return cls(bool(rawbytes[2] == 3), rawbytes[1])
 
     def encode(self):
         return [self.cmd, self.key.encode(), self.onoff, 0x0F, 0x0F, 0x0F]
 
 
 class KeyReportRequestPacket(DuMangPacket):
-
     def __init__(self, key):
         super().__init__(KEY_REPORT_REQUEST_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
@@ -719,7 +693,6 @@ class KeyReportRequestPacket(DuMangPacket):
 
 
 class KeyReportResponsePacket(DuMangPacket):
-
     def __init__(self, key, layer_keycodes, serial):
         super().__init__(KEY_REPORT_RESPONSE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
@@ -728,61 +701,51 @@ class KeyReportResponsePacket(DuMangPacket):
 
     @classmethod
     def fromrawbytes(cls, rawbytes):
-        serial = (rawbytes[2] << 24) + (rawbytes[3] << 16) + \
-                 (rawbytes[4] << 8) + rawbytes[5]
+        serial = (rawbytes[2] << 24) + (rawbytes[3] << 16) + (rawbytes[4] << 8) + rawbytes[5]
         return cls(
-            rawbytes[1], {
-                0: Keycode(rawbytes[7]),
-                1: Keycode(rawbytes[8]),
-                2: Keycode(rawbytes[9]),
-                3: Keycode(rawbytes[10])
-            }, f"{serial:08X}")
+            rawbytes[1],
+            {0: Keycode(rawbytes[7]), 1: Keycode(rawbytes[8]), 2: Keycode(rawbytes[9]), 3: Keycode(rawbytes[10])},
+            f"{serial:08X}",
+        )
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} Serial:{} LayerKeycodes:{}".format(
-            self.__class__.__name__, self.cmd, self.key, self.serial,
-            self.layer_keycodes)
+            self.__class__.__name__, self.cmd, self.key, self.serial, self.layer_keycodes
+        )
 
 
 class KeyConfigurePacket(DuMangPacket):
-
     def __init__(self, key, layer_keycodes):
         super().__init__(KEY_CONFIGURE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
-        self.layer_keycodes = {
-            k: v.encode() if isinstance(v, Keycode) else v
-            for k, v in layer_keycodes.items()
-        }
+        self.layer_keycodes = {k: v.encode() if isinstance(v, Keycode) else v for k, v in layer_keycodes.items()}
 
     def encode(self):
         return [
             self.cmd,
-            self.key.encode() + 1, self.layer_keycodes[1],
-            self.layer_keycodes[2], self.layer_keycodes[3], 0xFF,
-            self.layer_keycodes[0]
+            self.key.encode() + 1,
+            self.layer_keycodes[1],
+            self.layer_keycodes[2],
+            self.layer_keycodes[3],
+            0xFF,
+            self.layer_keycodes[0],
         ]
 
     def __repr__(self):
-        return "{} - CMD:{:02X} Key:{} LayerKeycodes:{}".format(
-            self.__class__.__name__, self.cmd, self.key, self.layer_keycodes)
+        return f"{self.__class__.__name__} - CMD:{self.cmd:02X} Key:{self.key} LayerKeycodes:{self.layer_keycodes}"
 
 
 class MacroReportRequestPacket(DuMangPacket):
-
     def __init__(self, key, idx):
         super().__init__(MACRO_REPORT_REQUEST_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
         self.idx = idx
 
     def encode(self):
-        return [
-            self.cmd,
-            self.key.encode(), self.idx + MACRO_MIN_IDX, 0x00, 0x00
-        ]
+        return [self.cmd, self.key.encode(), self.idx + MACRO_MIN_IDX, 0x00, 0x00]
 
 
 class MacroReportResponsePacket(DuMangPacket):
-
     def __init__(self, key, idx, type_, keycode, delay):
         super().__init__(MACRO_REPORT_RESPONSE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
@@ -793,18 +756,21 @@ class MacroReportResponsePacket(DuMangPacket):
 
     @classmethod
     def fromrawbytes(cls, rawbytes):
-        return cls(rawbytes[1], rawbytes[2] - MACRO_MIN_IDX,
-                   MacroType(rawbytes[3]), Keycode(rawbytes[4]),
-                   rawbytes[5] * 256 + rawbytes[6])
+        return cls(
+            rawbytes[1],
+            rawbytes[2] - MACRO_MIN_IDX,
+            MacroType(rawbytes[3]),
+            Keycode(rawbytes[4]),
+            rawbytes[5] * 256 + rawbytes[6],
+        )
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} Idx:{} Type:{} Keycode:{} Delay:{}".format(
-            self.__class__.__name__, self.cmd, self.key, self.idx, self.type,
-            self.keycode, self.delay)
+            self.__class__.__name__, self.cmd, self.key, self.idx, self.type, self.keycode, self.delay
+        )
 
 
 class MacroConfigurePacket(DuMangPacket):
-
     def __init__(self, key, idx, type_, keycode, delay):
         super().__init__(MACRO_CONFIGURE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
@@ -816,14 +782,18 @@ class MacroConfigurePacket(DuMangPacket):
     def encode(self):
         return [
             self.cmd,
-            self.key.encode(), self.idx + MACRO_MIN_IDX, self.type.type,
-            self.keycode.keycode, self.delay // 256, self.delay % 256
+            self.key.encode(),
+            self.idx + MACRO_MIN_IDX,
+            self.type.type,
+            self.keycode.keycode,
+            self.delay // 256,
+            self.delay % 256,
         ]
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} Idx:{} Type:{} Keycode:{} Delay:{}".format(
-            self.__class__.__name__, self.cmd, self.key, self.idx, self.type,
-            self.keycode, self.delay)
+            self.__class__.__name__, self.cmd, self.key, self.idx, self.type, self.keycode, self.delay
+        )
 
 
 def signal_handler(signal, frame):
@@ -838,18 +808,18 @@ def initialize_devices():
     ctrl_device = []
     for d in device_list:
         # TODO: Is there some way to check version of firmware?
-        if d['interface_number'] == 1:
+        if d["interface_number"] == 1:
             ctrl_device.append(d)
 
     for d in ctrl_device:
         try:
             h = hid.device()
-            h.open_path(d['path'])
-            b = DuMangBoard(d['serial_number'], h)
+            h.open_path(d["path"])
+            b = DuMangBoard(d["serial_number"], h)
             b.write_packet(InitializationPacket())
             init_devices.append(b)
 
-        except IOError as ex:
+        except OSError as ex:
             logger.error(ex, exc_info=True)
             logger.error("Likely permissions error.")
             sys.exit(1)
@@ -865,7 +835,7 @@ class TooManyBoards(Exception):
     pass
 
 
-class DetectedDevice(object):
+class DetectedDevice:
     onClose = lambda device: None
 
     def __init__(self, handle):
@@ -873,7 +843,7 @@ class DetectedDevice(object):
 
     def __str__(self):
         # For demonstration purposes only.
-        return 'USB Detected Device at ' + str(self._handle.getDevice())
+        return "USB Detected Device at " + str(self._handle.getDevice())
 
     def close(self):
         # Note: device may have already left when this method is called,
@@ -896,9 +866,7 @@ class USBConnectionMonitor:
     def __init__(self, vendor_id, product_id):
         self.context = usb1.USBContext()
         if not self.context.hasCapability(usb1.CAP_HAS_HOTPLUG):
-            raise NoHotplugSupport(
-                'Hotplug support is missing. Please update your libusb version.'
-            )
+            raise NoHotplugSupport("Hotplug support is missing. Please update your libusb version.")
         self._device_dict = {}
         self.vendor_id = vendor_id
         self.product_id = product_id
@@ -907,24 +875,23 @@ class USBConnectionMonitor:
         self._has_started = False
 
     def _on_device_left(self, detected_device):
-        logger.debug(f'Device left: {str(detected_device)}')
+        logger.debug(f"Device left: {detected_device!s}")
 
     def _on_device_arrived(self, detected_device):
         detected_device.onClose = self._on_device_left
-        logger.debug(f'Device arrived: {str(detected_device)}')
+        logger.debug(f"Device arrived: {detected_device!s}")
 
     def _register_callback(self):
         self._callback_handle = self.context.hotplugRegisterCallback(
             self._on_hotplug_event,
             # Just in case more events are added in the future.
-            events=usb1.HOTPLUG_EVENT_DEVICE_ARRIVED
-            | usb1.HOTPLUG_EVENT_DEVICE_LEFT,
+            events=usb1.HOTPLUG_EVENT_DEVICE_ARRIVED | usb1.HOTPLUG_EVENT_DEVICE_LEFT,
             # Edit these if you handle devices from a single vendor, of a
             # single product type or of a single device class; and simplify
             # device filtering accordingly in _on_hotplug_event.
             vendor_id=self.vendor_id,
             product_id=self.product_id,
-            #dev_class=,
+            # dev_class=,
         )
 
     def _deregister_callback(self):
@@ -954,11 +921,10 @@ class USBConnectionMonitor:
             self._has_started = True
             self.ready()
         elif total_connected < self._notify_threshold:
-            if (self._has_started):
+            if self._has_started:
                 self.wait()
         else:
-            raise TooManyBoards(
-                'Too many boards connected. Not sure how to handle it.')
+            raise TooManyBoards("Too many boards connected. Not sure how to handle it.")
 
     def ready(self):
         self.notify_q.put(NOTIFY_STATUS_READY)
@@ -990,7 +956,7 @@ class USBConnectionMonitorRunner(USBConnectionMonitor):
 
     def _run(self):
         with self.context:
-            logger.debug('Registering hotplug callback...')
+            logger.debug("Registering hotplug callback...")
             self._register_callback()
             while not self._shutdown_flag.is_set():
                 # NOTE: This call will block until callback is deregistered.

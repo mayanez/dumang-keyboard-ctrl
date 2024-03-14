@@ -1,6 +1,8 @@
-import logging
 import click
+import logging
 import threading
+import signal
+
 import dumang_ctrl as pkginfo
 from dumang_ctrl.dumang.common import *
 
@@ -10,21 +12,20 @@ logger.setLevel(logging.INFO)
 
 def layer_toggle_process(p):
     press = 0
-    half = 0
 
-    if (p.cmd == LAYER_PRESS_CMD):
+    if p.cmd == LAYER_PRESS_CMD:
         press = 0x03
-    elif (p.cmd == LAYER_DEPRESS_CMD):
+    elif p.cmd == LAYER_DEPRESS_CMD:
         press = 0x02
 
-    if (press > 0):
+    if press > 0:
         return SyncPacket(p.ID, press, p.layer_info)
 
 
 def send_response(p, q):
     response = None
 
-    if isinstance(p, LayerPressPacket) or isinstance(p, LayerDepressPacket):
+    if isinstance(p, (LayerPressPacket, LayerDepressPacket)):
         response = layer_toggle_process(p)
 
     if response:
@@ -34,21 +35,29 @@ def send_response(p, q):
 def sync_thread(kbd1, kbd2):
     p = kbd1.recv_q.get()
     if isinstance(p, JobKiller):
-        logger.debug('Kill Sync Thread')
+        logger.debug("Kill Sync Thread")
         return
     send_response(p, kbd2.send_q)
     kbd1.recv_q.task_done()
 
 
 def init_synchronization_threads(kbd1, kbd2):
-    s1 = Job(target=sync_thread, args=(
-        kbd1,
-        kbd2,
-    ), daemon=True)
-    s2 = Job(target=sync_thread, args=(
-        kbd2,
-        kbd1,
-    ), daemon=True)
+    s1 = Job(
+        target=sync_thread,
+        args=(
+            kbd1,
+            kbd2,
+        ),
+        daemon=True,
+    )
+    s2 = Job(
+        target=sync_thread,
+        args=(
+            kbd2,
+            kbd1,
+        ),
+        daemon=True,
+    )
     return [s1, s2]
 
 
@@ -72,11 +81,11 @@ def device_init_thread(monitor):
     while True:
         status = monitor.get_status()
         if status == NOTIFY_STATUS_READY:
-            logger.debug('Keyboards Detected!')
-            logger.debug('Initializing...')
+            logger.debug("Keyboards Detected!")
+            logger.debug("Initializing...")
             kbd1, kbd2 = initialize_devices()
 
-            logger.debug('Starting sync threads...')
+            logger.debug("Starting sync threads...")
             threads.extend(init_send_threads(kbd1, kbd2))
             threads.extend(init_receive_threads(kbd1, kbd2))
             threads.extend(init_synchronization_threads(kbd1, kbd2))
@@ -84,8 +93,8 @@ def device_init_thread(monitor):
             for t in threads:
                 t.start()
         elif status == NOTIFY_STATUS_WAIT:
-            logger.debug('Keyboard Disconnected!')
-            logger.debug('Stopping sync threads...')
+            logger.debug("Keyboard Disconnected!")
+            logger.debug("Stopping sync threads...")
             # NOTE: Kill threads and wait for devices to be reconnected.
             kbd1.kill_threads()
             kbd2.kill_threads()
@@ -99,7 +108,7 @@ def device_init_thread(monitor):
             kbd1.close()
             kbd2.close()
         elif status == NOTIFY_STATUS_STOP:
-            logger.debug('Stopping sync threads...')
+            logger.debug("Stopping sync threads...")
 
             if not kbd1 or not kbd2:
                 logger.info("Could not find devices. Make sure you've setup udev rules!")
@@ -120,9 +129,7 @@ def device_init_thread(monitor):
 
 
 monitor = USBConnectionMonitorRunner(VENDOR_ID, PRODUCT_ID)
-device_thread = threading.Thread(target=device_init_thread,
-                                 args=(monitor, ),
-                                 daemon=True)
+device_thread = threading.Thread(target=device_init_thread, args=(monitor,), daemon=True)
 
 
 def sync_terminate_handler(signal, frame):
@@ -132,7 +139,7 @@ def sync_terminate_handler(signal, frame):
 
 
 def sync():
-    logger.info('Staring DuMang Layer Sync...')
+    logger.info("Staring DuMang Layer Sync...")
     signal.signal(signal.SIGINT, sync_terminate_handler)
 
     monitor.start()
@@ -143,11 +150,9 @@ def sync():
 
 
 @click.command(help="Enable Layer Sync between two keyboard halves")
-@click.option('--verbose', help="Enable Verbose Logging", is_flag=True)
-@click.option('--very-verbose',
-              help="Enable Very Verbose Logging",
-              is_flag=True)
-@click.option('--version', help="Print Version", is_flag=True)
+@click.option("--verbose", help="Enable Verbose Logging", is_flag=True)
+@click.option("--very-verbose", help="Enable Very Verbose Logging", is_flag=True)
+@click.option("--version", help="Print Version", is_flag=True)
 def cli(verbose, very_verbose, version):
     if very_verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -155,9 +160,9 @@ def cli(verbose, very_verbose, version):
         logger.setLevel(logging.DEBUG)
 
     if version:
-        click.echo(f'{pkginfo.description}')
-        click.echo(f'Version: {pkginfo.version}')
-        click.echo(f'Report issues to: {pkginfo.url}')
+        click.echo(f"{pkginfo.description}")
+        click.echo(f"Version: {pkginfo.version}")
+        click.echo(f"Report issues to: {pkginfo.url}")
         return
 
     sync()
