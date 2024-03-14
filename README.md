@@ -1,71 +1,45 @@
-# DuMang DK6 Keyboard Programming Tools
+
+![Logo](images/dumang-logo.png)
+# BeyondQ DuMang Keyboard Programming Tools
 ![GitHub](https://img.shields.io/github/license/mayanez/dumang-keyboard-ctrl)
 ![PyPI](https://img.shields.io/pypi/v/dumang-ctrl)
+![MadeWithPython](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)
+![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
 
-This is an open-source toolset for use with the DuMang DK6 line of keyboards from Beyong Q (www.beyondq.com/).
+This is an open-source toolset for use with the DuMang line of keyboards from [Beyond Q](www.beyondq.com/).
 
 These keyboards are fully programmable and support multiple layers.
 
-It currently supports:
+Supported OSes:
 
-* Linux
-* Mac OS X
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
+
+![Mac OS X](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=apple&logoColor=white)
 
 *NOTE:* For correct functionality under Linux, you need to copy the udev file provided in this repo into the appropriate directory for you distro. You might then need to call `udevadm control --reload-rules` to reload the rules.
+
+Should you run into any problems please open an `Issue`. Hopefully I can help 😸
 
 ## Install
 
 ### Using PyPI
 
     $ pip install dumang-ctrl
-    
-### Build from Source
 
-    $ git clone https://github.com/mayanez/dumang-keyboard-ctrl.git
-    $ cd dumang-keyboard-ctrl
-    $ python setup.py install
+The PyPI package can be found at https://pypi.org/project/dumang-ctrl/
 
-### Dependencies
+### Using Arch Linux
+![ArchLinux](https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=arch-linux&logoColor=white)
 
-Please see the corresponding files in the `install` directory.
+Using your AUR helper of choice install the `dumang-ctrl` [package](https://aur.archlinux.org/packages/dumang-ctrl).
 
-## Tools
+## Usage
 
-### Sync Tool
+Please refer to the Github Pages or `docs/`.
 
-This tool is a daemon process that can be used to sync the two keyboard halves for layer functionality. 
+## Build (for Development)
 
-You may want to setup this tool to run at startup. Depending on your distribution `systemd` is a likely solution. See https://github.com/arjun024/systemd-example-startup for an example. An Arch Linux AUR and Debian package are soon to follow which will make this seamless.
+    $ make setup
+    $ make build
 
-#### Run
-
-    $ dumang-sync
-     
-or 
-
-    $ python -m dumang_ctrl.tools.sync
-
-### Programming Tool
-
-This tool provides a very rough implementation for programming keys. Please refer to the help message for options on how to run. Essentially it uses a `config.yml` that configures each key for a given layer.
-The `inspect` command launches a GUI that you can use to toggle the LED for a particular key in order to get its keycode. I'm new to GUI programming so don't expect anything fancy yet. This tool in general will require a bit more reverse engineering so stay tuned.
-
-#### Run
-
-    $ dumang-config --help
-
-or 
-
-    $ python -m dumang_ctrl.tools.config
-
-#### Usage
-A minimal example `config.yml` file is included at the top of the repo.
-
-It works as follows:
- - The `serial` corresponds to the unique identifier for each keyboard half.
- - Under `keys` you can list out the configuration you want to override for each key according to it's unique key module ID (eg. `key_00` in the example).
- - Each key can be assigned up to 4 layers (eg. `layer_0` - `layer_3`).
-
-To identify both the `serial` and key module ID you'll want to use the GUI. Once you've figured out your `config.yml` you can use `dumang-config config config.yml` to flash the keyboard halves. It will only write the keys that are specified in the file, all other keys will be unaffected. 
-
-You can generate a dump of your current config with `dumang-config dump > myconfig.yml`.
+You may activate the virtualenv by running `make shell`.
