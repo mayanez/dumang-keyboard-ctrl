@@ -19,6 +19,7 @@ YAML_LABEL_BOARD = "board"
 YAML_LABEL_MACRO = "macro"
 YAML_LABEL_TYPE = "type"
 YAML_LABEL_DELAY_MS = "delay_ms"
+YAML_LABEL_NKRO = "nkro"
 
 CTX_KEYBOARDS_KEY = "KEYBOARDS"
 CTX_THREADS_KEY = "THREADS"
@@ -135,7 +136,14 @@ def configure_keys(cfg_kbd, kbds):
 def configure_boards(cfg, kbds):
     n = 0
     for cfg_kbd in cfg:
-        n += configure_keys(cfg_kbd[YAML_LABEL_BOARD], kbds)
+        cfg_board = cfg_kbd[YAML_LABEL_BOARD]
+        n += configure_keys(cfg_board, kbds)
+        board = find_kbd_by_serial(kbds, cfg_board[YAML_LABEL_SERIAL])
+        if board:
+            nkro = cfg_board.get(YAML_LABEL_NKRO, DEFAULT_NKRO_VALUE)
+            logger.info(f"Configuring NKRO to: {nkro}")
+            board.put(NKROConfigurePacket(nkro))
+
     return n
 
 
@@ -185,6 +193,7 @@ def dump(ctx):
         cfg_board = {
             YAML_LABEL_BOARD: {
                 YAML_LABEL_SERIAL: kbd.serial,
+                YAML_LABEL_NKRO: kbd.nkro,
                 YAML_LABEL_KEYS: []
             }
         }

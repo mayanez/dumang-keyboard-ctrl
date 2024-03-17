@@ -21,11 +21,13 @@ KEY_CONFIGURE_CMD = 0x09
 MACRO_REPORT_REQUEST_CMD = 0x42
 MACRO_REPORT_RESPONSE_CMD = 0x43
 MACRO_CONFIGURE_CMD = 0x40
+NKRO_CONFIGURE_CMD = 0x44
 
 MACRO_MIN_IDX = 0x05
 MACRO_MAX_IDX = 0x45
 MACRO_MIN_DELAY_MS = 10
 
+DEFAULT_NKRO_VALUE = True
 VENDOR_ID = 0x0483
 PRODUCT_ID = 0x5710
 KBD_1_ID = 0x25
@@ -524,6 +526,8 @@ class DuMangBoard:
 
     def __init__(self, serial, handle):
         self.serial = serial
+        # TODO: Make nkro & report_rate arguments once this can be queried
+        self.nkro = DEFAULT_NKRO_VALUE
         self.handle = handle
         self._keys_initialized = False
         self._configured_keys = {}
@@ -881,6 +885,20 @@ class MacroConfigurePacket(DuMangPacket):
             self.__class__.__name__, self.cmd, self.key, self.idx, self.type,
             self.keycode, self.delay)
 
+
+# TODO: Is there a way to know if this is enabled?
+class NKROConfigurePacket(DuMangPacket):
+
+    def __init__(self, onoff):
+        super().__init__(NKRO_CONFIGURE_CMD, None)
+        self.onoff = 0x01 if onoff else 0x00
+
+    @classmethod
+    def fromrawbytes(cls, rawbytes):
+        return cls(bool(rawbytes[2] == 3), rawbytes[1])
+
+    def encode(self):
+        return [self.cmd, 0x01, 0x04, self.onoff, 0x17, 0x20, 0x00]
 
 
 def signal_handler(signal, frame):
