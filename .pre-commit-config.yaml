@@ -13,3 +13,8 @@ repos:
     rev: "v3.0.3"
     hooks:
       - id: prettier
+
+  - repo: https://github.com/google/yapf
+    rev: "v0.40.2"
+    hooks:
+      - id: yapf

@@ -2,6 +2,7 @@ import logging
 import queue
 import sys
 import threading
+from collections import deque
 
 import hid
 import usb1
@@ -23,6 +24,7 @@ MACRO_CONFIGURE_CMD = 0x40
 
 MACRO_MIN_IDX = 0x05
 MACRO_MAX_IDX = 0x45
+MACRO_MIN_DELAY_MS = 10
 
 VENDOR_ID = 0x0483
 PRODUCT_ID = 0x5710
@@ -391,6 +393,8 @@ class Keycode:
 class MacroType:
     KEYDOWN = 0x01
     KEYUP = 0x02
+    WAIT_KEYUP = 0x04
+    """Used to define Split Section Macros (ie. execute part 1 on key down and part 2 on key up)"""
 
     def __init__(self, type_):
         self.type = type_
@@ -411,8 +415,47 @@ class MacroType:
                 if not callable(value) and typestr == attribute:
                     return cls(value)
 
+    def __eq__(self, other):
+        return self.type == other.type
+
     def __repr__(self):
         return self.typestr
+
+
+class Macro:
+
+    def __init__(self, keycode, idx, type, delay):
+        self.keycode = Keycode.fromstr(keycode) if not isinstance(
+            keycode, Keycode) else keycode
+        self.idx = idx
+        self.type = MacroType.fromstr(type) if not isinstance(
+            type, MacroType) else type
+        if delay < MACRO_MIN_DELAY_MS:
+            self.delay = MACRO_MIN_DELAY_MS
+            logger.warning(
+                f"Cannot set macro delay less than {MACRO_MIN_DELAY_MS}. Setting to {MACRO_MIN_DELAY_MS}."
+            )
+        else:
+            self.delay = delay
+
+    def topacket(self, key):
+        return MacroConfigurePacket(key, self.idx, self.type, self.keycode,
+                                    self.delay)
+
+    @classmethod
+    def frompacket(cls, packet):
+        if not isinstance(packet, MacroReportResponsePacket):
+            logger.error("Cannot create class from this packet type!")
+            return None
+        return cls(packet.keycode, packet.idx, packet.type, packet.delay)
+
+    def __eq__(self, other):
+        return (self.keycode, self.idx, self.type,
+                self.delay) == (other.keycode, other.idx, other.type,
+                                other.delay)
+
+    def __repr__(self):
+        return f"{self.keycode}/{self.idx}/{self.type}/{self.delay}"
 
 
 class Job(threading.Thread):
@@ -543,13 +586,10 @@ class DuMangBoard:
 
         self.write_packet(p)
 
-    def configured_key(self, k):
-        if self._keys_initialized:
-            return self._configured_keys[k]
-
     @property
     def configured_keys(self):
         if not self._keys_initialized:
+            macro_requests = deque()
             pending = 0
             for k in range(MAX_KEYS):
                 self.put(KeyReportRequestPacket(k))
@@ -559,18 +599,32 @@ class DuMangBoard:
                 p = self.recv_q.get()
                 if isinstance(p, KeyReportResponsePacket):
                     pending -= 1
-                    if any([kc.keycode != 0 for kc in p.layer_keycodes.values()]):
+                    if any(
+                        [kc.keycode != 0 for kc in p.layer_keycodes.values()]):
                         # NOTE: We add the layer_keycodes to the DKM
                         p.key.layer_keycodes = p.layer_keycodes
-                        self._configured_keys[p.serial] = DuMangKeyModule(p.key, p.layer_keycodes, p.serial)
-                    if any([kc.keycode == Keycode.MACRO for kc in p.layer_keycodes.values()]):
+                        self._configured_keys[p.serial] = DuMangKeyModule(
+                            p.key, p.layer_keycodes, p.serial)
+                    if any([
+                            kc.keycode == Keycode.MACRO
+                            for kc in p.layer_keycodes.values()
+                    ]):
                         self.put(MacroReportRequestPacket(p.key, 0))
+                        # We queue macro requests as we encounter new DKMs.
+                        # The board does NOT seem to reorder packets,
+                        # therefore this should be reliable. Otherwise,
+                        # this might need to be revisited. Ideally,
+                        # the MacroReportResponsePacket would have the DKM serial as well.
+                        macro_requests.append(p.serial)
                         pending += 1
                 if isinstance(p, MacroReportResponsePacket):
                     pending -= 1
                     if p.type.type not in [0, 0xFF]:
-                        self._configured_keys[p.serial].macro.append(p)
+                        key_serial = macro_requests.popleft()
+                        self._configured_keys[key_serial].macro.append(
+                            Macro.frompacket(p))
                         self.put(MacroReportRequestPacket(p.key, p.idx + 1))
+                        macro_requests.append(key_serial)
                         pending += 1
             self._keys_initialized = True
 

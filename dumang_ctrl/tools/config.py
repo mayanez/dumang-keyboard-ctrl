@@ -50,14 +50,12 @@ def find_kbd_by_serial(kbds, serial):
 
 
 def find_key_by_serial(kbd, serial):
-    for _, dkm in kbd.configured_keys.items():
-        if dkm.serial == serial:
-            return dkm.key
-    return None
+    return kbd.configured_keys[serial]
 
 
-def configure_key(b, key, cfg_key):
+def configure_key(board, key, cfg_key):
     layer_keycodes = {}
+    did_configure = False
     for layer in cfg_key:
         if not layer.startswith(YAML_LABEL_LAYER_PREFIX):
             continue
@@ -68,25 +66,38 @@ def configure_key(b, key, cfg_key):
         logger.debug(
             f"Configuring DKM serial {cfg_key[YAML_LABEL_SERIAL]} to {layer_keycodes}"
         )
-        b.put(KeyConfigurePacket(key, layer_keycodes))
+        board.put(KeyConfigurePacket(key, layer_keycodes))
+        did_configure = True
     else:
         logger.debug(
             f"DKM serial {cfg_key[YAML_LABEL_SERIAL]} already properly configured"
         )
 
-    macro = cfg_key.get(YAML_LABEL_MACRO)
-    if macro and (key.macro != macro):
+    cfg_macro = cfg_key.get(YAML_LABEL_MACRO)
+    if cfg_macro:
         logger.debug(
             f"Configuring DKM serial {cfg_key[YAML_LABEL_SERIAL]} macro")
-        idx = 0
-        for m in macro:
-            b.put(
-                MacroConfigurePacket(key, idx,
-                                     MacroType.fromstr(m[YAML_LABEL_TYPE]),
-                                     Keycode.fromstr(m[YAML_LABEL_KEY]),
-                                     int(m[YAML_LABEL_DELAY_MS])))
-            idx += 1
-        b.put(MacroConfigurePacket(key, idx, MacroType(0), Keycode(0), 0))
+
+        cfg_macro_obj_list = [
+            Macro(m[YAML_LABEL_KEY], idx, m[YAML_LABEL_TYPE],
+                  int(m[YAML_LABEL_DELAY_MS]))
+            for idx, m in enumerate(cfg_macro)
+        ]
+
+        if key.macro != cfg_macro_obj_list:
+            print("not equal")
+            print(key.macro)
+            print(cfg_macro_obj_list)
+
+            for m in cfg_macro_obj_list:
+                board.put(m.topacket(key.key))
+            board.put(
+                MacroConfigurePacket(key.key,
+                                     len(cfg_macro_obj_list) + 1, MacroType(0),
+                                     Keycode(0), 0))
+            did_configure = True
+
+    return did_configure
 
 
 def configure_keys(cfg_kbd, kbds):
@@ -115,8 +126,9 @@ def configure_keys(cfg_kbd, kbds):
                 f"DKM with serial {key_serial} found on a different board. Maybe moved from board {cfg_kbd_serial} to {b.serial} ?"
             )
 
-        configure_key(board, key, cfg_key)
-        n += 1
+        if configure_key(board, key, cfg_key):
+            n += 1
+
     return n
 
 
@@ -190,12 +202,9 @@ def dump(ctx):
                     kc)
             if dkm.macro:
                 cfg_key[YAML_LABEL_KEY][YAML_LABEL_MACRO] = [{
-                    YAML_LABEL_TYPE:
-                    str(m.type),
-                    YAML_LABEL_KEY:
-                    str(m.keycode),
-                    YAML_LABEL_DELAY_MS:
-                    m.delay,
+                    YAML_LABEL_TYPE: str(m.type),
+                    YAML_LABEL_KEY: str(m.keycode),
+                    YAML_LABEL_DELAY_MS: m.delay,
                 } for m in dkm.macro]
             cfg_keys.append(cfg_key)
             n += 1
