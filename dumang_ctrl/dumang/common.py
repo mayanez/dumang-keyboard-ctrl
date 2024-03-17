@@ -31,8 +31,9 @@ PRODUCT_ID = 0x5710
 KBD_1_ID = 0x25
 KBD_2_ID = 0x0D
 
-# NOTE: Technically the maximum is 256, but we cap it to reduce "request" times
-MAX_KEYS = 50
+# NOTE: Unless configured in "overload" mode (which is considered unstable),
+# according to documentation, max amount of DKM per board is 44.
+MAX_KEYS = 44
 MAX_LAYERS = 4
 UNKNOWN_MACROTYPE_STR = "UNKNOWN"
 
