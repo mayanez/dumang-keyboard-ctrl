@@ -111,7 +111,9 @@ def device_init_thread(monitor):
             logger.debug("Stopping sync threads...")
 
             if not kbd1 or not kbd2:
-                logger.info("Could not find devices. Make sure you've setup udev rules!")
+                logger.info(
+                    "Could not find devices. Make sure you've setup udev rules!"
+                )
                 return
 
             kbd1.kill_threads()
@@ -129,7 +131,8 @@ def device_init_thread(monitor):
 
 
 monitor = USBConnectionMonitorRunner(VENDOR_ID, PRODUCT_ID)
-device_thread = threading.Thread(target=device_init_thread, args=(monitor,), daemon=True)
+device_thread = threading.Thread(
+    target=device_init_thread, args=(monitor,), daemon=True)
 
 
 def sync_terminate_handler(signal, frame):
@@ -151,7 +154,8 @@ def sync():
 
 @click.command(help="Enable Layer Sync between two keyboard halves")
 @click.option("--verbose", help="Enable Verbose Logging", is_flag=True)
-@click.option("--very-verbose", help="Enable Very Verbose Logging", is_flag=True)
+@click.option(
+    "--very-verbose", help="Enable Very Verbose Logging", is_flag=True)
 @click.option("--version", help="Print Version", is_flag=True)
 def cli(verbose, very_verbose, version):
     if very_verbose:

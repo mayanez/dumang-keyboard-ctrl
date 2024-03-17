@@ -22,7 +22,8 @@ class KBDTableView(QTableWidget):
         self.viewport().installEventFilter(self)
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().setStretchLastSection(True)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        self.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Fixed)
         self.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
 
     def setData(self):
@@ -55,20 +56,25 @@ class KBDTableView(QTableWidget):
         # Previous solution as descriped in https://stackoverflow.com/questions/20064975
         # proved problematic when scrolling as it would trigger Enter events, but no Leave events.
         if item != self._last_item and self._last_item is not None:
-            p = LightPulsePacket(False, self.keys[self.item(self._last_item.row(), 0).data(0)].key)
+            p = LightPulsePacket(
+                False, self.keys[self.item(self._last_item.row(),
+                                           0).data(0)].key)
             kbd.put(p)
 
-        p = LightPulsePacket(True, self.keys[self.item(item.row(), 0).data(0)].key)
+        p = LightPulsePacket(True, self.keys[self.item(item.row(),
+                                                       0).data(0)].key)
         kbd.put(p)
         self._last_item = item
 
     def _on_itemLeave(self, kbd):
-        p = LightPulsePacket(False, self.keys[self.item(self._last_item.row(), 0).data(0)].key)
+        p = LightPulsePacket(
+            False, self.keys[self.item(self._last_item.row(), 0).data(0)].key)
         kbd.put(p)
         pass
 
 
 class KBDWidget(QWidget):
+
     def __init__(self, parent, kbd):
         super(QWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -79,7 +85,8 @@ class KBDWidget(QWidget):
     def _add_table_widget(self, kbd):
         kbd_widget = KBDTableView(kbd.configured_keys)
         kbd_widget.setMouseTracking(True)
-        kbd_widget.itemEntered.connect(lambda item: kbd_widget._on_itemEntered(kbd, item))
+        kbd_widget.itemEntered.connect(
+            lambda item: kbd_widget._on_itemEntered(kbd, item))
         kbd_widget.itemLeave.connect(lambda: kbd_widget._on_itemLeave(kbd))
         return kbd_widget
 
@@ -91,6 +98,7 @@ class KBDWidget(QWidget):
 
 
 class KBDTab(QWidget):
+
     def __init__(self, parent, kbd):
         super(QWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -123,6 +131,7 @@ class KBDTab(QWidget):
 
 
 class KBDTabs(QWidget):
+
     def __init__(self, parent, kbds):
         super(QWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -142,10 +151,13 @@ class KBDTabs(QWidget):
     def on_click(self):
         print("\n")
         for currentQTableWidgetItem in self.tableWidget.selectedItems():
-            print(currentQTableWidgetItem.row(), currentQTableWidgetItem.column(), currentQTableWidgetItem.text())
+            print(currentQTableWidgetItem.row(),
+                  currentQTableWidgetItem.column(),
+                  currentQTableWidgetItem.text())
 
 
 class App(QMainWindow):
+
     def __init__(self):
         super().__init__()
         self.title = "Dumang Board Configuration Inspection Tool"
@@ -159,7 +171,8 @@ class App(QMainWindow):
 
     def center(self):
         pass
-        centerPoint = QtGui.QGuiApplication.primaryScreen().availableGeometry().center()
+        centerPoint = QtGui.QGuiApplication.primaryScreen().availableGeometry(
+        ).center()
         self.move(centerPoint - self.frameGeometry().center())
 
 

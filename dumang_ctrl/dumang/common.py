@@ -459,13 +459,15 @@ class Macro:
 
 
 class Job(threading.Thread):
+
     def __init__(self, **kwargs):
         try:
             args = kwargs["args"]
         except KeyError:
             args = []
 
-        super().__init__(target=kwargs["target"], args=args, daemon=kwargs["daemon"])
+        super().__init__(
+            target=kwargs["target"], args=args, daemon=kwargs["daemon"])
         self.shutdown_flag = threading.Event()
         self.started = False
 
@@ -486,12 +488,14 @@ class Job(threading.Thread):
 
 
 class JobKiller:
+
     def __init__(self):
         self.init = True
 
 
 # TODO: Implement remaining packet types.
 class DuMangKeyModule:
+
     def __init__(self, key, layer_keycodes=None, serial=None):
         self.key = key
         self.layer_keycodes = layer_keycodes
@@ -632,6 +636,7 @@ class DuMangBoard:
 
 
 class DuMangPacket:
+
     def __init__(self, cmd, rawbytes):
         self.cmd = cmd
         self.rawbytes = rawbytes
@@ -666,11 +671,12 @@ class DuMangPacket:
 
     def __repr__(self):
         return "{} - CMD:{:02X} raw:[{}]".format(
-            self.__class__.__name__, self.cmd, ", ".join(hex(x) for x in self.rawbytes)
-        )
+            self.__class__.__name__, self.cmd,
+            ", ".join(hex(x) for x in self.rawbytes))
 
 
 class InitializationPacket(DuMangPacket):
+
     def __init__(self):
         super().__init__(INIT_CMD, None)
 
@@ -679,6 +685,7 @@ class InitializationPacket(DuMangPacket):
 
 
 class LayerPressPacket(DuMangPacket):
+
     def __init__(self, ID, flag, layer_info):
         super().__init__(LAYER_PRESS_CMD, None)
         self.ID = ID
@@ -691,11 +698,12 @@ class LayerPressPacket(DuMangPacket):
 
     def __repr__(self):
         return "{} - CMD:{:02X} ID:{:02X} Flag:{:02X} LayerInfo:{:02X}".format(
-            self.__class__.__name__, self.cmd, self.ID, self.flag, self.layer_info
-        )
+            self.__class__.__name__, self.cmd, self.ID, self.flag,
+            self.layer_info)
 
 
 class LayerDepressPacket(DuMangPacket):
+
     def __init__(self, ID, flag, layer_info):
         super().__init__(LAYER_DEPRESS_CMD, None)
         self.ID = ID
@@ -708,11 +716,12 @@ class LayerDepressPacket(DuMangPacket):
 
     def __repr__(self):
         return "{} - CMD:{:02X} ID:{:02X} Flag:{:02X} LayerInfo:{:02X}".format(
-            self.__class__.__name__, self.cmd, self.ID, self.flag, self.layer_info
-        )
+            self.__class__.__name__, self.cmd, self.ID, self.flag,
+            self.layer_info)
 
 
 class SyncPacket(DuMangPacket):
+
     def __init__(self, ID, press, layer_info):
         super().__init__(SYNC_CMD, None)
         self.ID = ID
@@ -720,10 +729,14 @@ class SyncPacket(DuMangPacket):
         self.layer_info = layer_info
 
     def encode(self):
-        return [self.cmd, 0x01, self.press, 0x00, self.ID, self.layer_info, self.layer_info & 0x03, 0x00]
+        return [
+            self.cmd, 0x01, self.press, 0x00, self.ID, self.layer_info,
+            self.layer_info & 0x03, 0x00
+        ]
 
 
 class LightPulsePacket(DuMangPacket):
+
     def __init__(self, onoff, key):
         super().__init__(LIGHT_PULSE_CMD, None)
         self.onoff = 0x03 if onoff else 0x02
@@ -738,6 +751,7 @@ class LightPulsePacket(DuMangPacket):
 
 
 class KeyReportRequestPacket(DuMangPacket):
+
     def __init__(self, key):
         super().__init__(KEY_REPORT_REQUEST_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
@@ -747,6 +761,7 @@ class KeyReportRequestPacket(DuMangPacket):
 
 
 class KeyReportResponsePacket(DuMangPacket):
+
     def __init__(self, key, layer_keycodes, serial):
         super().__init__(KEY_REPORT_RESPONSE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
@@ -755,24 +770,34 @@ class KeyReportResponsePacket(DuMangPacket):
 
     @classmethod
     def fromrawbytes(cls, rawbytes):
-        serial = (rawbytes[2] << 24) + (rawbytes[3] << 16) + (rawbytes[4] << 8) + rawbytes[5]
+        serial = (rawbytes[2] << 24) + (rawbytes[3] << 16) + (
+            rawbytes[4] << 8) + rawbytes[5]
         return cls(
             rawbytes[1],
-            {0: Keycode(rawbytes[7]), 1: Keycode(rawbytes[8]), 2: Keycode(rawbytes[9]), 3: Keycode(rawbytes[10])},
+            {
+                0: Keycode(rawbytes[7]),
+                1: Keycode(rawbytes[8]),
+                2: Keycode(rawbytes[9]),
+                3: Keycode(rawbytes[10])
+            },
             f"{serial:08X}",
         )
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} Serial:{} LayerKeycodes:{}".format(
-            self.__class__.__name__, self.cmd, self.key, self.serial, self.layer_keycodes
-        )
+            self.__class__.__name__, self.cmd, self.key, self.serial,
+            self.layer_keycodes)
 
 
 class KeyConfigurePacket(DuMangPacket):
+
     def __init__(self, key, layer_keycodes):
         super().__init__(KEY_CONFIGURE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
-        self.layer_keycodes = {k: v.encode() if isinstance(v, Keycode) else v for k, v in layer_keycodes.items()}
+        self.layer_keycodes = {
+            k: v.encode() if isinstance(v, Keycode) else v
+            for k, v in layer_keycodes.items()
+        }
 
     def encode(self):
         return [
@@ -790,16 +815,21 @@ class KeyConfigurePacket(DuMangPacket):
 
 
 class MacroReportRequestPacket(DuMangPacket):
+
     def __init__(self, key, idx):
         super().__init__(MACRO_REPORT_REQUEST_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
         self.idx = idx
 
     def encode(self):
-        return [self.cmd, self.key.encode(), self.idx + MACRO_MIN_IDX, 0x00, 0x00]
+        return [
+            self.cmd,
+            self.key.encode(), self.idx + MACRO_MIN_IDX, 0x00, 0x00
+        ]
 
 
 class MacroReportResponsePacket(DuMangPacket):
+
     def __init__(self, key, idx, type_, keycode, delay):
         super().__init__(MACRO_REPORT_RESPONSE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
@@ -820,11 +850,12 @@ class MacroReportResponsePacket(DuMangPacket):
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} Idx:{} Type:{} Keycode:{} Delay:{}".format(
-            self.__class__.__name__, self.cmd, self.key, self.idx, self.type, self.keycode, self.delay
-        )
+            self.__class__.__name__, self.cmd, self.key, self.idx, self.type,
+            self.keycode, self.delay)
 
 
 class MacroConfigurePacket(DuMangPacket):
+
     def __init__(self, key, idx, type_, keycode, delay):
         super().__init__(MACRO_CONFIGURE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
@@ -846,8 +877,9 @@ class MacroConfigurePacket(DuMangPacket):
 
     def __repr__(self):
         return "{} - CMD:{:02X} Key:{} Idx:{} Type:{} Keycode:{} Delay:{}".format(
-            self.__class__.__name__, self.cmd, self.key, self.idx, self.type, self.keycode, self.delay
-        )
+            self.__class__.__name__, self.cmd, self.key, self.idx, self.type,
+            self.keycode, self.delay)
+
 
 
 def signal_handler(signal, frame):
@@ -920,7 +952,9 @@ class USBConnectionMonitor:
     def __init__(self, vendor_id, product_id):
         self.context = usb1.USBContext()
         if not self.context.hasCapability(usb1.CAP_HAS_HOTPLUG):
-            raise NoHotplugSupport("Hotplug support is missing. Please update your libusb version.")
+            raise NoHotplugSupport(
+                "Hotplug support is missing. Please update your libusb version."
+            )
         self._device_dict = {}
         self.vendor_id = vendor_id
         self.product_id = product_id
@@ -939,7 +973,8 @@ class USBConnectionMonitor:
         self._callback_handle = self.context.hotplugRegisterCallback(
             self._on_hotplug_event,
             # Just in case more events are added in the future.
-            events=usb1.HOTPLUG_EVENT_DEVICE_ARRIVED | usb1.HOTPLUG_EVENT_DEVICE_LEFT,
+            events=usb1.HOTPLUG_EVENT_DEVICE_ARRIVED
+            | usb1.HOTPLUG_EVENT_DEVICE_LEFT,
             # Edit these if you handle devices from a single vendor, of a
             # single product type or of a single device class; and simplify
             # device filtering accordingly in _on_hotplug_event.
@@ -978,7 +1013,8 @@ class USBConnectionMonitor:
             if self._has_started:
                 self.wait()
         else:
-            raise TooManyBoards("Too many boards connected. Not sure how to handle it.")
+            raise TooManyBoards(
+                "Too many boards connected. Not sure how to handle it.")
 
     def ready(self):
         self.notify_q.put(NOTIFY_STATUS_READY)

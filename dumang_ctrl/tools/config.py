@@ -141,9 +141,8 @@ def configure_boards(cfg, kbds):
 
 @click.group(help="Configuration Tool", invoke_without_command=True)
 @click.option("--verbose", help="Enable Verbose Logging", is_flag=True)
-@click.option("--very-verbose",
-              help="Enable Very Verbose Logging",
-              is_flag=True)
+@click.option(
+    "--very-verbose", help="Enable Very Verbose Logging", is_flag=True)
 @click.option("--version", help="Print Version", is_flag=True)
 @click.pass_context
 def cli(ctx, verbose, very_verbose, version):
@@ -212,11 +211,12 @@ def dump(ctx):
         cfg_yml.append(cfg_board)
         kbd.kill_threads()
 
-    yaml.dump(cfg_yml,
-              sys.stdout,
-              allow_unicode=True,
-              default_flow_style=False,
-              sort_keys=False)
+    yaml.dump(
+        cfg_yml,
+        sys.stdout,
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False)
     logger.info(f"Dumped {n} keys.")
 
     for t in ctx.obj[CTX_THREADS_KEY]:

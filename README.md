@@ -1,6 +1,7 @@
-
 ![Logo](images/dumang-logo.png)
+
 # BeyondQ DuMang Keyboard Programming Tools
+
 ![GitHub](https://img.shields.io/github/license/mayanez/dumang-keyboard-ctrl)
 ![PyPI](https://img.shields.io/pypi/v/dumang-ctrl)
 ![MadeWithPython](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)
@@ -16,7 +17,7 @@ Supported OSes:
 
 ![Mac OS X](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=apple&logoColor=white)
 
-*NOTE:* For correct functionality under Linux, you need to copy the udev file provided in this repo into the appropriate directory for you distro. You might then need to call `udevadm control --reload-rules` to reload the rules.
+_NOTE:_ For correct functionality under Linux, you need to copy the udev file provided in this repo into the appropriate directory for you distro. You might then need to call `udevadm control --reload-rules` to reload the rules.
 
 Should you run into any problems please open an `Issue`. Hopefully I can help ðŸ˜¸
 
@@ -29,6 +30,7 @@ Should you run into any problems please open an `Issue`. Hopefully I can help ðŸ
 The PyPI package can be found at https://pypi.org/project/dumang-ctrl/
 
 ### Using Arch Linux
+
 ![ArchLinux](https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=arch-linux&logoColor=white)
 
 Using your AUR helper of choice install the `dumang-ctrl` [package](https://aur.archlinux.org/packages/dumang-ctrl).

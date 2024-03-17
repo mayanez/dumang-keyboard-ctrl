@@ -10,7 +10,7 @@ url="https://github.com/mayanez/dumang-keyboard-ctrl"
 license=('GPL-3.0-or-later')
 depends=('python' 'libusb' 'qt6-base' 'hidapi' 'python-hidapi' 'python-pyqt6' 'python-pyyaml' 'python-libusb1' 'python-click')
 makedepends=(
-  git 
+  git
   make
   python-poetry
   python-installer
