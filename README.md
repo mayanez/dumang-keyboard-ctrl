@@ -1,4 +1,4 @@
-![Logo](images/dumang-logo.png)
+![Logo](docs/images/dumang-logo.png)
 
 # BeyondQ DuMang Keyboard Programming Tools
 
@@ -37,7 +37,7 @@ Using your AUR helper of choice install the `dumang-ctrl` [package](https://aur.
 
 ## Usage
 
-Please refer to the Github Pages or `docs/`.
+Please refer to the [Github Pages](https://mayanez.github.io/dumang-keyboard-ctrl/) or `docs/`.
 
 ## Build (for Development)
 
