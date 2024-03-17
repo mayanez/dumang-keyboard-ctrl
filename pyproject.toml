@@ -21,6 +21,7 @@ click  = "*"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.5.1"
+yapf = "*"
 pre-commit = "^3.4.0"
 
 [tool.poetry.group.docs.dependencies]
@@ -35,6 +36,10 @@ dumang-config = 'dumang_ctrl.tools.config:cli'
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.yapf]
+based_on_style = "yapf"
+indent_width = 4
 
 [tool.mypy]
 files = ["dumang_ctrl"]
