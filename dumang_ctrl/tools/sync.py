@@ -81,10 +81,19 @@ def device_init_thread(monitor):
     while True:
         status = monitor.get_status()
         if status == NOTIFY_STATUS_READY:
-            logger.debug("Keyboards Detected!")
+            logger.debug("Keyboard Detected!")
             logger.debug("Initializing...")
+            # If both boards aren't connected, one of these may be `None`.
+            # In which case we will enter this state twice.
+            # We only want to begin the sync threads once we have
+            # two devices.
             kbd1, kbd2 = initialize_devices()
 
+            if not (kbd1 and kbd2):
+                logger.info("Waiting for other Keyboard...")
+                continue
+
+            logger.debug("Both keyboards detected.")
             logger.debug("Starting sync threads...")
             threads.extend(init_send_threads(kbd1, kbd2))
             threads.extend(init_receive_threads(kbd1, kbd2))
@@ -92,10 +101,15 @@ def device_init_thread(monitor):
 
             for t in threads:
                 t.start()
+
         elif status == NOTIFY_STATUS_WAIT:
             logger.debug("Keyboard Disconnected!")
             logger.debug("Stopping sync threads...")
+
             # NOTE: Kill threads and wait for devices to be reconnected.
+            # By this stage both keyboard halves would have been initialized.
+            # If a board is disconnected, the object remains valid so we
+            # can destroy it.
             kbd1.kill_threads()
             kbd2.kill_threads()
 
@@ -110,12 +124,14 @@ def device_init_thread(monitor):
         elif status == NOTIFY_STATUS_STOP:
             logger.debug("Stopping sync threads...")
 
-            if not kbd1 or not kbd2:
+            if not (kbd1 or kbd2):
                 logger.info(
                     "Could not find devices. Make sure you've setup udev rules!"
                 )
                 return
 
+            # NOTE: Same as the NOTIFY_STATUS_WAIT case above. However,
+            # here we want to return from the loop.
             kbd1.kill_threads()
             kbd2.kill_threads()
 
@@ -127,6 +143,7 @@ def device_init_thread(monitor):
 
             kbd1.close()
             kbd2.close()
+
             return
 
 
