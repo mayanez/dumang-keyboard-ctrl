@@ -1,9 +1,16 @@
 [Unit]
 Description=DuMang DK6 Layer Sync
+# NOTE: Two systemd services are required since on suspend, libusb does NOT raise a HOTPLUG_EVENT_DEVICE_LEFT
+# event. This means the sync script doesn't know the keyboard handles are invalid upon resuming.
+# TODO: Is this expected behavior on part of libusb or a bug?
+Before=sleep.target
+StopWhenUnneeded=yes
 
 [Service]
-Type=Simple
-ExecStart=dumang-sync
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=-/bin/systemctl stop dumang-sync-python.service
+ExecStop=-/bin/systemctl start dumang-sync-python.service
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=sleep.target

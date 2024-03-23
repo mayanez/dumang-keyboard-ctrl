@@ -1,0 +1,9 @@
+[Unit]
+Description=DuMang DK6 Layer Sync (Python Invoke)
+
+[Service]
+Type=Simple
+ExecStart=dumang-sync
+
+[Install]
+WantedBy=multi-user.target
