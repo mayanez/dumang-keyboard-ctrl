@@ -17,7 +17,7 @@ This tool is a daemon process that can be used to sync the two keyboard halves f
 
 You may want to setup this tool to run at startup. Depending on your distribution `systemd` is a likely solution. See <https://github.com/arjun024/systemd-example-startup> for an example. If you installed via the AUR package this is setup automatically.
 
-_NOTE:_ libusb does NOT raise a `HOTPLUG_EVENT_DEVICE_LEFT` event on suspend (at least on Linux). This means the sync script doesn't know the keyboard handles are invalid upon resuming. Two address this two `systemd` scripts can be used. See the `systemd/` directory in the repo. The AUR package takes this approach.
+_NOTE:_ libusb does NOT raise a `HOTPLUG_EVENT_DEVICE_LEFT` event on suspend (at least on Linux). This means the sync script doesn't know the keyboard handles are invalid upon resuming. To address this, two `systemd` scripts can be used. See the `systemd/` directory in the repo. The AUR package takes this approach.
 
 ### Run
 
