@@ -1,8 +1,7 @@
 # Maintainer: maarroyo <archlinux@arroyo.me>
-
 _pkgname=dumang-ctrl
 pkgname=$_pkgname-git
-pkgver=aa4b15d949e3296008ab549540f34ac853a1e94c
+pkgver=VERSION
 pkgrel=1
 pkgdesc="DuMang DK6 Keyboard Programming Tools"
 arch=('any')
@@ -21,8 +20,11 @@ source=($pkgname::git+https://github.com/mayanez/dumang-keyboard-ctrl.git)
 md5sums=('SKIP')
 
 pkgver() {
-  cd $pkgname
-  git log --format="%H" -n 1
+  cd "$pkgname"
+  ( set -o pipefail
+    git describe --long --abbrev=7 2>/dev/null | sed 's/\([^-]*-g\)/r\1/;s/-/./g' ||
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+  )
 }
 
 build() {
@@ -35,6 +37,7 @@ package() {
   cd $pkgname
   python -m installer --destdir="$pkgdir" dist/*.whl
   install -Dm644 udev/51-dumang.rules "$pkgdir/usr/lib/udev/rules.d/51-dumang.rules" || return 1
+  install -Dm644 systemd/dumang-sync-python.service "$pkgdir/usr/lib/systemd/system/dumang-sync-python.service" || return 1
   install -Dm644 systemd/dumang-sync.service "$pkgdir/usr/lib/systemd/system/dumang-sync.service" || return 1
   install -vDm 644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
   install=systemd/dumang-sync.install
