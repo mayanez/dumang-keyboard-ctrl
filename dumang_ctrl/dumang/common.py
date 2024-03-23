@@ -941,22 +941,19 @@ class TooManyBoards(Exception):
 
 
 class DetectedDevice:
-    onClose = lambda device: None
 
-    def __init__(self, handle):
+    def __init__(self, handle, on_close):
         self._handle = handle
+        self._on_close = on_close
 
     def __str__(self):
-        # For demonstration purposes only.
         return "USB Detected Device at " + str(self._handle.getDevice())
 
     def close(self):
         # Note: device may have already left when this method is called,
         # so catch USBErrorNoDevice around cleanup steps involving the device.
         try:
-            self.onClose(self)
-            # Put device in low-power mode, release claimed interfaces...
-            pass
+            self.on_close(self)
         except usb1.USBErrorNoDevice:
             pass
         self._handle.close()
@@ -984,9 +981,10 @@ class USBConnectionMonitor:
     def _on_device_left(self, detected_device):
         logger.debug(f"Device left: {detected_device!s}")
 
-    def _on_device_arrived(self, detected_device):
-        detected_device.onClose = self._on_device_left
+    def _on_device_arrived(self, handle):
+        detected_device = DetectedDevice(handle, self._on_device_left)
         logger.debug(f"Device arrived: {detected_device!s}")
+        return detected_device
 
     def _register_callback(self):
         self._callback_handle = self.context.hotplugRegisterCallback(
@@ -1008,19 +1006,16 @@ class USBConnectionMonitor:
     def _on_hotplug_event(self, context, device, event):
         if event == usb1.HOTPLUG_EVENT_DEVICE_LEFT:
             device_from_event = self._device_dict.pop(device, None)
-            self._update_status()
             if device_from_event is not None:
                 device_from_event.close()
+            self._update_status()
             return
         try:
             handle = device.open()
-        except usb1.USBError:
+        except usb1.USBError as ex:
+            logger.error(ex, exc_info=True)
             return
-        detected_device = DetectedDevice(handle)
-        if self._on_device_arrived(detected_device):
-            detected_device.close()
-            return
-        self._device_dict[device] = detected_device
+        self._device_dict[device] = self._on_device_arrived(handle)
         self._update_status()
 
     def _update_status(self):

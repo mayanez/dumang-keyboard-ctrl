@@ -107,11 +107,10 @@ def device_init_thread(monitor):
             logger.debug("Stopping sync threads...")
 
             # NOTE: Kill threads and wait for devices to be reconnected.
-            # By this stage both keyboard halves would have been initialized.
-            # If a board is disconnected, the object remains valid so we
-            # can destroy it.
-            kbd1.kill_threads()
-            kbd2.kill_threads()
+            if kbd1:
+                kbd1.kill_threads()
+            if kbd2:
+                kbd2.kill_threads()
 
             for t in threads:
                 t.stop()
@@ -119,8 +118,15 @@ def device_init_thread(monitor):
             for t in threads:
                 t.join()
 
-            kbd1.close()
-            kbd2.close()
+            threads = []
+
+            if kbd1:
+                kbd1.close()
+            if kbd2:
+                kbd2.close()
+
+            kbd1 = None
+            kbd2 = None
         elif status == NOTIFY_STATUS_STOP:
             logger.debug("Stopping sync threads...")
 
@@ -132,8 +138,10 @@ def device_init_thread(monitor):
 
             # NOTE: Same as the NOTIFY_STATUS_WAIT case above. However,
             # here we want to return from the loop.
-            kbd1.kill_threads()
-            kbd2.kill_threads()
+            if kbd1:
+                kbd1.kill_threads()
+            if kbd2:
+                kbd2.kill_threads()
 
             for t in threads:
                 t.stop()
@@ -141,8 +149,15 @@ def device_init_thread(monitor):
             for t in threads:
                 t.join()
 
-            kbd1.close()
-            kbd2.close()
+            threads = []
+
+            if kbd1:
+                kbd1.close()
+            if kbd2:
+                kbd2.close()
+
+            kbd1 = None
+            kbd2 = None
 
             return
 
