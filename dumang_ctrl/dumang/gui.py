@@ -104,10 +104,13 @@ class KBDTab(QWidget):
         self.layout = QVBoxLayout(self)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        self.kbd_label = QLabel(f"Board Serial: {kbd.serial}")
-        self.layout.addWidget(self.kbd_label)
+        self.kbd_serial_label = QLabel(f"Board Serial: {kbd.serial}")
+        self.layout.addWidget(self.kbd_serial_label)
+        self.kbd_firmware_label = QLabel(
+            f"Firmware: v{kbd.version[0]}.{kbd.version[1]}")
+        self.layout.addWidget(self.kbd_firmware_label)
 
-        # TODO: Refresh Button
+        # TODO: Refresh Button & Display DKM Firmware Versions & Color
 
         # Add dropdown/combo box
         headers = [f"Layer {i}" for i in range(MAX_LAYERS)]

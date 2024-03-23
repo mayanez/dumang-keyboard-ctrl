@@ -9,25 +9,36 @@ import usb1
 
 logger = logging.getLogger(__name__)
 
-INIT_CMD = 0x30
-SYNC_CMD = 0x46
-INFO_CMD = 0x18
+BOARD_INFO_REQUEST_CMD = 0x30
+BOARD_INFO_RESPONSE_CMD = 0x31
+DKM_INFO_REQUEST_CMD = 0x06
+DKM_INFO_RESPONSE_CMD = 0x07
+BOARD_SYNC_CMD = 0x46
 LAYER_PRESS_CMD = 0x3E
 LAYER_DEPRESS_CMD = 0x3C
 LIGHT_PULSE_CMD = 0x2A
-KEY_REPORT_REQUEST_CMD = 0x04
-KEY_REPORT_RESPONSE_CMD = 0x05
-KEY_CONFIGURE_CMD = 0x09
+DKM_REPORT_REQUEST_CMD = 0x04
+DKM_REPORT_RESPONSE_CMD = 0x05
+DKM_ADDED_CMD = 0x18
+DKM_REMOVED_CMD = 0x1A
+DKM_CONFIGURE_CMD = 0x09
 MACRO_REPORT_REQUEST_CMD = 0x42
 MACRO_REPORT_RESPONSE_CMD = 0x43
 MACRO_CONFIGURE_CMD = 0x40
 NKRO_CONFIGURE_CMD = 0x44
+DKM_COLOR_REQUEST_CMD = 0x2C
+DKM_COLOR_RESPONSE_CMD = 0x2D
+DKM_COLOR_CONFIGURE_CMD = 0x2E
+REPORT_RATE_CONFIGURE_CMD = 0x34
 
 MACRO_MIN_IDX = 0x05
 MACRO_MAX_IDX = 0x45
 MACRO_MIN_DELAY_MS = 10
+MACRO_MAX_DELAY_MS = 255 * 255 + 255
 
 DEFAULT_NKRO_VALUE = True
+DEFAULT_REPORT_RATE = 1000
+
 VENDOR_ID = 0x0483
 PRODUCT_ID = 0x5710
 KBD_1_ID = 0x25
@@ -335,6 +346,13 @@ class Keycode:
     LAYER_KEY_3 = 0xDF
     """Change when long pressing to keyboard Layer 3"""
 
+    LEFT_MOUSE_CLICK = 0xF6
+    """Left mouse click"""
+    RIGHT_MOUSE_CLICK = 0xF7
+    """Right mouse click"""
+    MIDDLE_MOUSE_CLICK = 0xF8
+    """Middle mouse click"""
+
     TRANSPARENT = 0xFF
     """Transparent"""
 
@@ -438,6 +456,11 @@ class Macro:
             logger.warning(
                 f"Cannot set macro delay less than {MACRO_MIN_DELAY_MS}. Setting to {MACRO_MIN_DELAY_MS}."
             )
+        if delay > MACRO_MAX_DELAY_MS:
+            self.delay = MACRO_MAX_DELAY_MS
+            logger.warning(
+                f"Cannot set macro delay less than {MACRO_MAX_DELAY_MS}. Setting to {MACRO_MAX_DELAY_MS}."
+            )
         else:
             self.delay = delay
 
@@ -496,14 +519,21 @@ class JobKiller:
         self.init = True
 
 
-# TODO: Implement remaining packet types.
 class DuMangKeyModule:
 
-    def __init__(self, key, layer_keycodes=None, serial=None):
+    def __init__(self,
+                 key,
+                 layer_keycodes=None,
+                 serial=None,
+                 color=None,
+                 version=None):
+        assert isinstance(key, int)
         self.key = key
         self.layer_keycodes = layer_keycodes
         self.serial = serial
         self.macro = []
+        self.color = color
+        self.version = version
 
     def __lt__(self, other):
         return self.key < other.key
@@ -526,14 +556,27 @@ class DuMangBoard:
 
     def __init__(self, serial, handle):
         self.serial = serial
-        # TODO: Make nkro & report_rate arguments once this can be queried
-        self.nkro = DEFAULT_NKRO_VALUE
         self.handle = handle
         self._keys_initialized = False
         self._configured_keys = {}
         self.send_q = queue.Queue()
         self.recv_q = queue.Queue()
         self.should_stop = False
+        self._initialize()
+
+    def _initialize(self):
+        # NOTE: Because threads aren't started yet, it is important,
+        # to use write/read_packet().
+        self.write_packet(BoardInfoRequestPacket())
+        p = self.read_packet()
+
+        if isinstance(p, BoardInfoResponsePacket):
+            self.nkro = p.nkro
+            self.report_rate = p.report_rate
+            self.version = p.version
+        else:
+            self.nkro = DEFAULT_NKRO_VALUE
+            self.report_rate = DEFAULT_REPORT_RATE
 
     def write(self, rawbytes):
         self.handle.write(rawbytes)
@@ -548,6 +591,9 @@ class DuMangBoard:
 
     def put(self, v):
         self.send_q.put(v)
+
+    def get(self):
+        return self.recv_q.get()
 
     def close(self):
         # NOTE: A hacky way of verifying if the handle is still valid.
@@ -595,46 +641,65 @@ class DuMangBoard:
 
         self.write_packet(p)
 
-    @property
-    def configured_keys(self):
-        if not self._keys_initialized:
-            macro_requests = deque()
+    def _handle_dkm_reports(self):
+        pending = 0
+        for k in range(MAX_KEYS):
+            self.put(DKMReportRequestPacket(k))
+            pending += 1
+
+        while pending > 0:
+            p = self.get()
+            if isinstance(p, DKMReportResponsePacket):
+                pending -= 1
+                if any([kc.keycode != 0 for kc in p.layer_keycodes.values()]):
+                    # NOTE: We add the layer_keycodes to the DKM
+                    p.key.layer_keycodes = p.layer_keycodes
+                    self._configured_keys[p.serial] = DuMangKeyModule(
+                        p.key.key, p.layer_keycodes, p.serial)
+
+    def _handle_dkm_macros(self):
+        for _, dkm in self._configured_keys.items():
             pending = 0
-            for k in range(MAX_KEYS):
-                self.put(KeyReportRequestPacket(k))
+            if any([
+                    kc.keycode == Keycode.MACRO
+                    for kc in dkm.layer_keycodes.values()
+            ]):
+                self.put(MacroReportRequestPacket(dkm, 0))
                 pending += 1
 
             while pending > 0:
-                p = self.recv_q.get()
-                if isinstance(p, KeyReportResponsePacket):
-                    pending -= 1
-                    if any(
-                        [kc.keycode != 0 for kc in p.layer_keycodes.values()]):
-                        # NOTE: We add the layer_keycodes to the DKM
-                        p.key.layer_keycodes = p.layer_keycodes
-                        self._configured_keys[p.serial] = DuMangKeyModule(
-                            p.key, p.layer_keycodes, p.serial)
-                    if any([
-                            kc.keycode == Keycode.MACRO
-                            for kc in p.layer_keycodes.values()
-                    ]):
-                        self.put(MacroReportRequestPacket(p.key, 0))
-                        # We queue macro requests as we encounter new DKMs.
-                        # The board does NOT seem to reorder packets,
-                        # therefore this should be reliable. Otherwise,
-                        # this might need to be revisited. Ideally,
-                        # the MacroReportResponsePacket would have the DKM serial as well.
-                        macro_requests.append(p.serial)
-                        pending += 1
+                p = self.get()
                 if isinstance(p, MacroReportResponsePacket):
                     pending -= 1
                     if p.type.type not in [0, 0xFF]:
-                        key_serial = macro_requests.popleft()
-                        self._configured_keys[key_serial].macro.append(
-                            Macro.frompacket(p))
-                        self.put(MacroReportRequestPacket(p.key, p.idx + 1))
-                        macro_requests.append(key_serial)
+                        dkm.macro.append(Macro.frompacket(p))
+                        self.put(MacroReportRequestPacket(dkm, p.idx + 1))
                         pending += 1
+
+    def _handle_dkm_colors(self):
+        for _, dkm in self._configured_keys.items():
+            self.put(DKMColorRequestPacket(dkm))
+
+            p = self.get()
+            if isinstance(p, DKMColorResponsePacket):
+                dkm.color = (p.red, p.green, p.blue)
+
+    def _handle_dkm_info(self):
+        for _, dkm in self._configured_keys.items():
+            self.put(DKMInfoRequestPacket(dkm))
+
+            p = self.get()
+            if isinstance(p, DKMInfoResponsePacket):
+                dkm.version = p.version
+
+    @property
+    def configured_keys(self):
+        if not self._keys_initialized:
+            self._handle_dkm_reports()
+            self._handle_dkm_macros()
+            self._handle_dkm_colors()
+            self._handle_dkm_info()
+
             self._keys_initialized = True
 
         return self._configured_keys
@@ -656,14 +721,20 @@ class DuMangPacket:
                 c = LayerPressPacket.fromrawbytes(rawbytes)
             elif cmd == LAYER_DEPRESS_CMD:
                 c = LayerDepressPacket.fromrawbytes(rawbytes)
-            elif cmd == INIT_CMD:
-                c = InitializationPacket()
-            elif cmd == SYNC_CMD:
-                c = SyncPacket()
+            elif cmd == BOARD_INFO_RESPONSE_CMD:
+                c = BoardInfoResponsePacket.fromrawbytes(rawbytes)
+            elif cmd == DKM_INFO_RESPONSE_CMD:
+                c = DKMInfoResponsePacket.fromrawbytes(rawbytes)
+            elif cmd == DKM_COLOR_RESPONSE_CMD:
+                c = DKMColorResponsePacket.fromrawbytes(rawbytes)
             elif cmd == LIGHT_PULSE_CMD:
                 c = LightPulsePacket.fromrawbytes(rawbytes)
-            elif cmd == KEY_REPORT_RESPONSE_CMD:
-                c = KeyReportResponsePacket.fromrawbytes(rawbytes)
+            elif cmd == DKM_REPORT_RESPONSE_CMD:
+                c = DKMReportResponsePacket.fromrawbytes(rawbytes)
+            elif cmd == DKM_ADDED_CMD:
+                c = DKMAddedPacket.fromrawbytes(rawbytes)
+            elif cmd == DKM_REMOVED_CMD:
+                c = DKMRemovedPacket.fromrawbytes(rawbytes)
             elif cmd == MACRO_REPORT_RESPONSE_CMD:
                 c = MacroReportResponsePacket.fromrawbytes(rawbytes)
             else:
@@ -680,13 +751,65 @@ class DuMangPacket:
             ", ".join(hex(x) for x in self.rawbytes))
 
 
-class InitializationPacket(DuMangPacket):
+class BoardInfoRequestPacket(DuMangPacket):
 
     def __init__(self):
-        super().__init__(INIT_CMD, None)
+        super().__init__(BOARD_INFO_REQUEST_CMD, None)
 
     def encode(self):
         return [self.cmd, 0x00, 0x00, 0x00, 0x00]
+
+
+class BoardInfoResponsePacket(DuMangPacket):
+    REPORT_RATES = {
+        0x0A: 100,
+        0x08: 125,
+        0x05: 200,
+        0x04: 250,
+        0x03: 333,
+        0x02: 500,
+        0x01: 1000
+    }
+
+    def __init__(self, report_rate, nkro_enabled, version):
+        super().__init__(BOARD_INFO_RESPONSE_CMD, None)
+        self.report_rate = self.REPORT_RATES[report_rate]
+        # NOTE: 0x13 is False
+        self.nkro = True if nkro_enabled == 0x17 else False
+        self.version = version
+
+    @classmethod
+    def fromrawbytes(cls, rawbytes):
+        return cls(rawbytes[5], rawbytes[7], (rawbytes[3], rawbytes[4]))
+
+    def __repr__(self):
+        return "{} - CMD:{:02X} NKRO:{} Report Rate:{}".format(
+            self.__class__.__name__, self.cmd, self.nkro, self.report_rate)
+
+
+class DKMInfoRequestPacket(DuMangPacket):
+
+    def __init__(self, key):
+        super().__init__(DKM_INFO_REQUEST_CMD, None)
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
+
+    def encode(self):
+        return [self.cmd, self.key.encode(), 0x00, 0x00, 0x00]
+
+
+class DKMInfoResponsePacket(DuMangPacket):
+
+    def __init__(self, version):
+        super().__init__(DKM_INFO_RESPONSE_CMD, None)
+        self.version = version
+
+    @classmethod
+    def fromrawbytes(cls, rawbytes):
+        return cls((rawbytes[3], rawbytes[4]))
+
+    def __repr__(self):
+        return "{} - CMD:{:02X} Version:{}".format(self.__class__.__name__,
+                                                   self.cmd, self.version)
 
 
 class LayerPressPacket(DuMangPacket):
@@ -725,10 +848,10 @@ class LayerDepressPacket(DuMangPacket):
             self.layer_info)
 
 
-class SyncPacket(DuMangPacket):
+class BoardSyncPacket(DuMangPacket):
 
     def __init__(self, ID, press, layer_info):
-        super().__init__(SYNC_CMD, None)
+        super().__init__(BOARD_SYNC_CMD, None)
         self.ID = ID
         self.press = press
         self.layer_info = layer_info
@@ -755,20 +878,20 @@ class LightPulsePacket(DuMangPacket):
         return [self.cmd, self.key.encode(), self.onoff, 0x0F, 0x0F, 0x0F]
 
 
-class KeyReportRequestPacket(DuMangPacket):
+class DKMReportRequestPacket(DuMangPacket):
 
     def __init__(self, key):
-        super().__init__(KEY_REPORT_REQUEST_CMD, None)
+        super().__init__(DKM_REPORT_REQUEST_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
 
     def encode(self):
         return [self.cmd, self.key.encode(), 0x00, 0x00, 0x00]
 
 
-class KeyReportResponsePacket(DuMangPacket):
+class KeyReportBasePacket(DuMangPacket):
 
-    def __init__(self, key, layer_keycodes, serial):
-        super().__init__(KEY_REPORT_RESPONSE_CMD, None)
+    def __init__(self, cmd, key, layer_keycodes, serial):
+        super().__init__(cmd, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
         self.layer_keycodes = layer_keycodes
         self.serial = serial
@@ -794,10 +917,40 @@ class KeyReportResponsePacket(DuMangPacket):
             self.layer_keycodes)
 
 
-class KeyConfigurePacket(DuMangPacket):
+class DKMReportResponsePacket(KeyReportBasePacket):
+
+    def __init__(self, key, layer_keycodes, serial):
+        super().__init__(DKM_REPORT_RESPONSE_CMD, key, layer_keycodes, serial)
+
+    @classmethod
+    def fromrawbytes(cls, rawbytes):
+        return super().fromrawbytes(rawbytes)
+
+
+class DKMAddedPacket(KeyReportBasePacket):
+
+    def __init__(self, key, layer_keycodes, serial):
+        super().__init__(DKM_ADDED_CMD, key, layer_keycodes, serial)
+
+    @classmethod
+    def fromrawbytes(cls, rawbytes):
+        return super().fromrawbytes(rawbytes)
+
+
+class DKMRemovedPacket(KeyReportBasePacket):
+
+    def __init__(self, key, layer_keycodes, serial):
+        super().__init__(DKM_REMOVED_CMD, key, layer_keycodes, serial)
+
+    @classmethod
+    def fromrawbytes(cls, rawbytes):
+        return super().fromrawbytes(rawbytes)
+
+
+class DKMConfigurePacket(DuMangPacket):
 
     def __init__(self, key, layer_keycodes):
-        super().__init__(KEY_CONFIGURE_CMD, None)
+        super().__init__(DKM_CONFIGURE_CMD, None)
         self.key = DuMangKeyModule(key) if isinstance(key, int) else key
         self.layer_keycodes = {
             k: v.encode() if isinstance(v, Keycode) else v
@@ -876,7 +1029,7 @@ class MacroConfigurePacket(DuMangPacket):
             self.idx + MACRO_MIN_IDX,
             self.type.type,
             self.keycode.keycode,
-            self.delay // 256,
+            self.delay // 256,  # MAX: 255*255 + 255
             self.delay % 256,
         ]
 
@@ -886,19 +1039,88 @@ class MacroConfigurePacket(DuMangPacket):
             self.keycode, self.delay)
 
 
-# TODO: Is there a way to know if this is enabled?
 class NKROConfigurePacket(DuMangPacket):
 
     def __init__(self, onoff):
         super().__init__(NKRO_CONFIGURE_CMD, None)
         self.onoff = 0x01 if onoff else 0x00
 
-    @classmethod
-    def fromrawbytes(cls, rawbytes):
-        return cls(bool(rawbytes[2] == 3), rawbytes[1])
-
     def encode(self):
         return [self.cmd, 0x01, 0x04, self.onoff, 0x17, 0x20, 0x00]
+
+
+class ReportRateConfigurePacket(DuMangPacket):
+
+    REPORT_RATES = {
+        100: 0x0A,
+        125: 0x08,
+        200: 0x05,
+        250: 0x04,
+        333: 0x03,
+        500: 0x02,
+        1000: 0x01
+    }
+
+    def __init__(self, report_rate):
+        super().__init__(REPORT_RATE_CONFIGURE_CMD, None)
+        if not report_rate in self.REPORT_RATES:
+            logger.warning(
+                f"Invalid report rate. Supported values: {self.REPORT_RATES}.")
+            logger.info(f"Enabling default rate: {DEFAULT_REPORT_RATE}")
+            self.report_rate = DEFAULT_REPORT_RATE
+        else:
+            self.report_rate = report_rate
+
+    def encode(self):
+        return [
+            self.cmd, 0x00, self.REPORT_RATES[self.report_rate], 0x00, 0x00,
+            0x00
+        ]
+
+
+class DKMColorRequestPacket(DuMangPacket):
+
+    def __init__(self, key):
+        super().__init__(DKM_COLOR_REQUEST_CMD, None)
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
+
+    def encode(self):
+        return [self.cmd, self.key.encode(), 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+
+
+class DKMColorResponsePacket(DuMangPacket):
+
+    def __init__(self, red, green, blue):
+        super().__init__(DKM_COLOR_RESPONSE_CMD, None)
+        self.red = red
+        self.green = green
+        self.blue = blue
+
+    @classmethod
+    def fromrawbytes(cls, rawbytes):
+        # TODO: It's possible the key is encoded in this packet type.
+        return cls(rawbytes[3], rawbytes[4], rawbytes[5])
+
+    def __repr__(self):
+        return "{} - CMD:{:02X} Color: ({}, {}, {})".format(
+            self.__class__.__name__, self.cmd, self.red, self.green, self.blue)
+
+
+class DKMColorConfigurePacket(DuMangPacket):
+
+    def __init__(self, key, red, green, blue):
+        super().__init__(DKM_COLOR_CONFIGURE_CMD, None)
+        self.key = DuMangKeyModule(key) if isinstance(key, int) else key
+        # NOTE: LEDs can only encode 4bits of color per channel.
+        self.red = red % 16
+        self.green = green % 16
+        self.blue = blue % 16
+
+    def encode(self):
+        return [
+            self.cmd,
+            self.key.encode(), 0x00, self.red, self.green, self.blue
+        ]
 
 
 def signal_handler(signal, frame):
@@ -912,7 +1134,6 @@ def initialize_devices():
 
     ctrl_device = []
     for d in device_list:
-        # TODO: Is there some way to check version of firmware?
         if d["interface_number"] == 1:
             ctrl_device.append(d)
 
@@ -921,7 +1142,6 @@ def initialize_devices():
             h = hid.device()
             h.open_path(d["path"])
             b = DuMangBoard(d["serial_number"], h)
-            b.write_packet(InitializationPacket())
             init_devices.append(b)
 
         except OSError as ex:
@@ -989,15 +1209,10 @@ class USBConnectionMonitor:
     def _register_callback(self):
         self._callback_handle = self.context.hotplugRegisterCallback(
             self._on_hotplug_event,
-            # Just in case more events are added in the future.
             events=usb1.HOTPLUG_EVENT_DEVICE_ARRIVED
             | usb1.HOTPLUG_EVENT_DEVICE_LEFT,
-            # Edit these if you handle devices from a single vendor, of a
-            # single product type or of a single device class; and simplify
-            # device filtering accordingly in _on_hotplug_event.
             vendor_id=self.vendor_id,
             product_id=self.product_id,
-            # dev_class=,
         )
 
     def _deregister_callback(self):

@@ -19,7 +19,7 @@ def layer_toggle_process(p):
         press = 0x02
 
     if press > 0:
-        return SyncPacket(p.ID, press, p.layer_info)
+        return BoardSyncPacket(p.ID, press, p.layer_info)
 
 
 def send_response(p, q):
