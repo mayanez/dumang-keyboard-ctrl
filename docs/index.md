@@ -45,9 +45,35 @@ or
 
 The first thing you'll want to do is `dump` your current configuration:
 
-    $ dumang-config dump > config.yml
+    $ dumang-config dump --format=yaml > config.yml
+    $ dumang-config dump --format=json > config.json
 
-The configuration is a YAML file describing each _Board_ half, the attached _Key Modules_, and the keycodes associated with each _Layer_ or _Macro_. Each _Board_ and _Key Module_ will have an associated `serial` that is embedded in the hardware. Each _Key Module_ can be assigned up to four layers (eg. `layer_0` - `layer_3`) and one macro.
+The configuration is a file describing each _Board_ half, the attached _Key Modules_, and the keycodes associated with each _Layer_ or _Macro_. Each _Board_ and _Key Module_ will have an associated `serial` that is embedded in the hardware. Each _Key Module_ can be assigned up to four layers (eg. `layer_0` - `layer_3`), one macro, and one color.
+
+The following is an example of a YAML configuration file:
+
+```yml
+- board:
+    serial: "DEADBEEF" # as hex string
+    nkro: true # or false. When false at most 6 keys can be pressed at a given time.
+    report_rate: 1000 # Allowed values [100, 125, 200, 250, 333, 500, 1000]
+    keys:
+      - key:
+          serial: "28287602" # as hex string
+          layer_0: BACKSLASH # Refer to HID Keycodes in dumang_ctrl/dumang/common.py
+          layer_1: MACRO
+          layer_2: TRANSPARENT
+          layer_3: TRANSPARENT
+          color: "FF0000" # as hex string. Note that the LED can only represet 4-bits for each color channel [0x00 - 0x0F].
+          macro:
+            # A maximum of 69 entries are allowed.
+            - type: KEYDOWN # Valid types: [KEYDOWN, KEYUP, WAIT_KEYUP]
+              key: A
+              delay_ms: 10 # Delay Range: [10 - 65280]
+            - type: KEYUP
+              key: A
+              delay_ms: 10
+```
 
 #### inspect
 
@@ -61,6 +87,7 @@ The GUI will allow you to inspect your current configuration, but most important
 
 The `load` command does the opposite of the `dump` command and allows one to program _Key Modules_.
 
-    $ dumang-config load <file>
+    $ dumang-config load --format=yaml <file>
+    $ dumang-config load --format=json <file>
 
 This will only load the configuration onto _Key Modules_ that are specified in the file, all other keys will be unaffected.
