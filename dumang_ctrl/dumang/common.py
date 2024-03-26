@@ -14,8 +14,8 @@ BOARD_INFO_RESPONSE_CMD = 0x31
 DKM_INFO_REQUEST_CMD = 0x06
 DKM_INFO_RESPONSE_CMD = 0x07
 BOARD_SYNC_CMD = 0x46
-LAYER_PRESS_CMD = 0x3E
-LAYER_DEPRESS_CMD = 0x3C
+KEY_UP_CMD = 0x3E
+KEY_DOWN_CMD = 0x3C
 LIGHT_PULSE_CMD = 0x2A
 DKM_REPORT_REQUEST_CMD = 0x04
 DKM_REPORT_RESPONSE_CMD = 0x05
@@ -717,10 +717,10 @@ class DuMangPacket:
         if rawbytes:
             cmd = rawbytes[0]
 
-            if cmd == LAYER_PRESS_CMD:
-                c = LayerPressPacket.fromrawbytes(rawbytes)
-            elif cmd == LAYER_DEPRESS_CMD:
-                c = LayerDepressPacket.fromrawbytes(rawbytes)
+            if cmd == KEY_UP_CMD:
+                c = KeyDownPacket.fromrawbytes(rawbytes)
+            elif cmd == KEY_DOWN_CMD:
+                c = KeyUpPacket.fromrawbytes(rawbytes)
             elif cmd == BOARD_INFO_RESPONSE_CMD:
                 c = BoardInfoResponsePacket.fromrawbytes(rawbytes)
             elif cmd == DKM_INFO_RESPONSE_CMD:
@@ -812,10 +812,10 @@ class DKMInfoResponsePacket(DuMangPacket):
                                                    self.cmd, self.version)
 
 
-class LayerPressPacket(DuMangPacket):
+class KeyDownPacket(DuMangPacket):
 
     def __init__(self, ID, flag, layer_info):
-        super().__init__(LAYER_PRESS_CMD, None)
+        super().__init__(KEY_UP_CMD, None)
         self.ID = ID
         self.flag = flag
         self.layer_info = layer_info
@@ -830,10 +830,10 @@ class LayerPressPacket(DuMangPacket):
             self.layer_info)
 
 
-class LayerDepressPacket(DuMangPacket):
+class KeyUpPacket(DuMangPacket):
 
     def __init__(self, ID, flag, layer_info):
-        super().__init__(LAYER_DEPRESS_CMD, None)
+        super().__init__(KEY_DOWN_CMD, None)
         self.ID = ID
         self.flag = flag
         self.layer_info = layer_info
@@ -850,15 +850,15 @@ class LayerDepressPacket(DuMangPacket):
 
 class BoardSyncPacket(DuMangPacket):
 
-    def __init__(self, ID, press, layer_info):
+    def __init__(self, ID, layer_active, layer_info):
         super().__init__(BOARD_SYNC_CMD, None)
         self.ID = ID
-        self.press = press
+        self.layer_active = 0x03 if layer_active == True else 0x02
         self.layer_info = layer_info
 
     def encode(self):
         return [
-            self.cmd, 0x01, self.press, 0x00, self.ID, self.layer_info,
+            self.cmd, 0x01, self.layer_active, 0x00, self.ID, self.layer_info,
             self.layer_info & 0x03, 0x00
         ]
 

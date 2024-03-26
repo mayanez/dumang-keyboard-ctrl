@@ -11,21 +11,18 @@ logger.setLevel(logging.INFO)
 
 
 def layer_toggle_process(p):
-    press = 0
+    if isinstance(p, KeyUpPacket):
+        layer_active = False
+    elif isinstance(p, KeyDownPacket):
+        layer_active = True
 
-    if p.cmd == LAYER_PRESS_CMD:
-        press = 0x03
-    elif p.cmd == LAYER_DEPRESS_CMD:
-        press = 0x02
-
-    if press > 0:
-        return BoardSyncPacket(p.ID, press, p.layer_info)
+    return BoardSyncPacket(p.ID, layer_active, p.layer_info)
 
 
 def send_response(p, q):
     response = None
 
-    if isinstance(p, (LayerPressPacket, LayerDepressPacket)):
+    if isinstance(p, (KeyDownPacket, KeyUpPacket)):
         response = layer_toggle_process(p)
 
     if response:
@@ -73,6 +70,26 @@ def init_receive_threads(kbd1, kbd2):
     return [r1, r2]
 
 
+def kill_and_join_threads(kbd1, kbd2, threads):
+    if kbd1:
+        kbd1.kill_threads()
+    if kbd2:
+        kbd2.kill_threads()
+
+    for t in threads:
+        t.stop()
+
+    for t in threads:
+        t.join()
+
+    threads = []
+
+    if kbd1:
+        kbd1.close()
+    if kbd2:
+        kbd2.close()
+
+
 def device_init_thread(monitor):
     threads = []
     kbd1 = None
@@ -107,23 +124,7 @@ def device_init_thread(monitor):
             logger.debug("Stopping sync threads...")
 
             # NOTE: Kill threads and wait for devices to be reconnected.
-            if kbd1:
-                kbd1.kill_threads()
-            if kbd2:
-                kbd2.kill_threads()
-
-            for t in threads:
-                t.stop()
-
-            for t in threads:
-                t.join()
-
-            threads = []
-
-            if kbd1:
-                kbd1.close()
-            if kbd2:
-                kbd2.close()
+            kill_and_join_threads(kbd1, kbd2, threads)
 
             kbd1 = None
             kbd2 = None
@@ -138,23 +139,7 @@ def device_init_thread(monitor):
 
             # NOTE: Same as the NOTIFY_STATUS_WAIT case above. However,
             # here we want to return from the loop.
-            if kbd1:
-                kbd1.kill_threads()
-            if kbd2:
-                kbd2.kill_threads()
-
-            for t in threads:
-                t.stop()
-
-            for t in threads:
-                t.join()
-
-            threads = []
-
-            if kbd1:
-                kbd1.close()
-            if kbd2:
-                kbd2.close()
+            kill_and_join_threads(kbd1, kbd2, threads)
 
             kbd1 = None
             kbd2 = None
