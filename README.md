@@ -33,7 +33,7 @@ The PyPI package can be found at https://pypi.org/project/dumang-ctrl/
 
 ![ArchLinux](https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=arch-linux&logoColor=white)
 
-Using your AUR helper of choice install the `dumang-ctrl` [package](https://aur.archlinux.org/packages/dumang-ctrl).
+Using your AUR helper of choice install the `dumang-ctrl-git` [package](https://aur.archlinux.org/packages/dumang-ctrl-git).
 
 ## Usage
 
