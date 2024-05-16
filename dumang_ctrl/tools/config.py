@@ -315,11 +315,21 @@ def load(ctx, format, filename):
 def inspect(ctx):
     logger.info("Launching GUI")
     from dumang_ctrl.dumang.gui import inspect_gui
+    kbds = ctx.obj[CTX_KEYBOARDS_KEY]
+    threads = ctx.obj[CTX_THREADS_KEY]
 
-    inspect_gui(*ctx.obj[CTX_KEYBOARDS_KEY])
+    gui = inspect_gui(*kbds)
 
-    for t in ctx.obj[CTX_THREADS_KEY]:
+    for kbd in kbds:
+        kbd.kill_threads()
+
+    for t in threads:
         t.join()
+
+    for kbd in kbds:
+        kbd.close()
+
+    sys.exit(gui)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-import sys
-
 from PyQt6 import QtGui
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
@@ -70,7 +68,6 @@ class KBDTableView(QTableWidget):
         p = LightPulsePacket(
             False, self.keys[self.item(self._last_item.row(), 0).data(0)].key)
         kbd.put(p)
-        pass
 
 
 class KBDWidget(QWidget):
@@ -103,7 +100,6 @@ class KBDTab(QWidget):
         super(QWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-
         self.kbd_serial_label = QLabel(f"Board Serial: {kbd.serial}")
         self.layout.addWidget(self.kbd_serial_label)
         self.kbd_firmware_label = QLabel(
@@ -152,7 +148,6 @@ class KBDTabs(QWidget):
 
     @pyqtSlot()
     def on_click(self):
-        print("\n")
         for currentQTableWidgetItem in self.tableWidget.selectedItems():
             print(currentQTableWidgetItem.row(),
                   currentQTableWidgetItem.column(),
@@ -173,7 +168,6 @@ class App(QMainWindow):
         self.center()
 
     def center(self):
-        pass
         centerPoint = QtGui.QGuiApplication.primaryScreen().availableGeometry(
         ).center()
         self.move(centerPoint - self.frameGeometry().center())
@@ -185,4 +179,4 @@ def inspect_gui(kbd1, kbd2=None):
     kbds = [kbd for kbd in [kbd1, kbd2] if kbd is not None]
     app.setCentralWidget(KBDTabs(app, kbds))
     app.show()
-    sys.exit(init.exec())
+    return init.exec()
