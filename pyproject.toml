@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dumang-ctrl"
-version = "1.0.4"
+version = "1.0.5"
 description = "Dumang DK6 Tools"
 authors = ["Miguel A. Arroyo <email@arroyo.me>"]
 repository = "https://github.com/mayanez/dumang-keyboard-ctrl"
