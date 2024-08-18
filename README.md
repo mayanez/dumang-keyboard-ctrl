@@ -7,7 +7,7 @@
 ![MadeWithPython](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)
 ![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
 
-This is an open-source toolset for use with the DuMang line of keyboards from [Beyond Q](www.beyondq.com/).
+This is an open-source toolset for use with the DuMang line of keyboards from [Beyond Q](http://www.beyondq.com/).
 
 These keyboards are fully programmable and support multiple layers.
 
