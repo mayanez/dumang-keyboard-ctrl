@@ -774,13 +774,14 @@ class BoardInfoResponsePacket(DuMangPacket):
     def __init__(self, report_rate, nkro_enabled, version):
         super().__init__(BOARD_INFO_RESPONSE_CMD, None)
         self.report_rate = self.REPORT_RATES[report_rate]
-        # NOTE: 0x13 is False
-        self.nkro = True if nkro_enabled == 0x17 else False
+        self.nkro = True if nkro_enabled == 1 else False
         self.version = version
 
     @classmethod
     def fromrawbytes(cls, rawbytes):
-        return cls(rawbytes[5], rawbytes[7], (rawbytes[3], rawbytes[4]))
+        # NOTE: rawbytes[7] is a bit-vector. We currently only know
+        # that bit 3 corresponds to NKRO.
+        return cls(rawbytes[5], rawbytes[7] & 0b100, (rawbytes[3], rawbytes[4]))
 
     def __repr__(self):
         return "{} - CMD:{:02X} NKRO:{} Report Rate:{}".format(
